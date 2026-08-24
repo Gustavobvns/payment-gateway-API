@@ -1,7 +1,21 @@
 version: '3.8'
 
 services: 
-  api:
+
+# Banco de Dados Local no Docker Compose para testes
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: payment_db
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      
+  payment-gateway-api:
     build: 
       context: .
       dockerfile: Dockerfile
@@ -10,22 +24,10 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      #configurar apos criar banco
-      - ConnectionStrings__DefaultConnection=Host=postgres;Database=payment_db;Username=postgres;Password=adminpassword
+      - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=payment_db;Username=postgres;Password=postgrespassword;
     depends_on:
       - postgres
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: payment-postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: adminpassword   #configurar apos criar banco
-      POSTGRES_DB: payment_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
+# Persistencia de dados local do Postgres
   volumes:
     postgres_data:
