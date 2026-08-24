@@ -95,7 +95,7 @@ Contas:
 
 CodigosPagamento:
 - Id (UUID)
-- CodigoHash (Unique)
+- CodigoPagamentoHash (Unique)
 - ContaGeradoraId (FK)
 - ValorOriginal
 - DataVencimento
@@ -107,7 +107,6 @@ Transacoes:
 - ContaOrigemId (FK)
 - ContaDestinoId (FK)
 - Valor
-- Tipo
 - CodigoPagamentoId (FK, Nullable)
 - DataHora
 ```
