@@ -81,7 +81,7 @@ Este projeto representa o *core* de movimentações financeiras de uma carteira 
 
 ```text
 Usuarios:
-- Id (UUID)
+- Id (GRIDv7)
 - Nome
 - Documento (Unique)
 - Email (Unique)
@@ -89,12 +89,12 @@ Usuarios:
 - ativo
 
 Contas:
-- Id (UUID)
+- Id (GRIDv7)
 - UsuarioId (FK)
 - Saldo (Numeric)
 
 CodigosPagamento:
-- Id (UUID)
+- Id (GRIDv7)
 - CodigoPagamentoHash (Unique)
 - ContaGeradoraId (FK)
 - ValorOriginal
@@ -103,7 +103,7 @@ CodigosPagamento:
 - Status
 
 Transacoes:
-- Id (UUID)
+- Id (GRIDv7)
 - ContaOrigemId (FK)
 - ContaDestinoId (FK)
 - Valor

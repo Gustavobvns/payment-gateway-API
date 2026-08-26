@@ -1,8 +1,9 @@
+namespace payment_Gateway_API.Models;
+
 public class Contas
 {
-    public int Id {get; set;}
+    public Guid Id { get; set; } = Guid.CreateVersion7();
 
-    public int UsuarioId {get; set;}
-
-    public decimal Valor {get; set;}
+    public Guid UsuarioId {get; set;}
+    public decimal Saldo {get; set;}
 }

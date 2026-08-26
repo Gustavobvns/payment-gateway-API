@@ -26,8 +26,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=payment_db;Username=postgres;Password=postgrespassword;
     depends_on:
-      - postgres
+      - postgres-db
 
 # Persistencia de dados local do Postgres
-  volumes:
-    postgres_data:
+volumes:
+   postgres_data:

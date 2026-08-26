@@ -1,8 +1,10 @@
+namespace payment_Gateway_API.Models;
+
 public class CodigosPagamento
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; } = Guid.CreateVersion7();
     public string CodigoPagamentoHash { get; set; }
-    public int ContaGeradoraId { get; set; }
+    public Guid ContaGeradoraId { get; set; }
     public decimal ValorOriginal { get; set; }
     public DateOnly DataVencimento { get; set; }
     public decimal JurosDiario { get; set; }
