@@ -1,4 +1,3 @@
-using System.Net.NetworkInformation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using payment_Gateway_API.Models;

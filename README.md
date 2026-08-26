@@ -117,7 +117,7 @@ Transacoes:
 
 ```text
 payment-gateway-API/
-└── FinPay.API/
+└── src/
     ├── Data/
     ├── Models/
     │
@@ -127,6 +127,7 @@ payment-gateway-API/
     │   ├── Payments/
     │   └── Ledger/
     │
+    │── Migrations/
     ├── Program.cs
     ├── appsettings.json
     ├── Dockerfile

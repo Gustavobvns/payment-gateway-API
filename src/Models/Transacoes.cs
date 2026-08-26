@@ -8,4 +8,7 @@ public class Transacoes
     public decimal Valor { get; set; }
     public Guid? CodigoPagamentoId { get; set; }
     public DateTime DataTransacao { get; set; }
+    public Contas ContaOrigem { get; set; } = null!;
+    public Contas ContaDestino { get; set; } = null!;
+    public CodigosPagamento? CodigoPagamento { get; set; }
 }

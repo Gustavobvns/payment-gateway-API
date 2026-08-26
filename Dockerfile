@@ -12,7 +12,7 @@ RUN dotnet restore "payment-gateway-API.csproj"
 # Copia todos os arquivos do projeto para a pasta de trabalho
 COPY . .
 # Compila o projeto e publica os arquivos de saída em uma pasta chamada /app/publish
-RUN dotnet publish "payment-gateway-API.csproj" -c Release -o
+RUN dotnet publish "payment-gateway-API.csproj" -c Release -o /app/publish
 
 
 # ETAPA 2: RUNTIME (O Executor)
@@ -20,7 +20,7 @@ RUN dotnet publish "payment-gateway-API.csproj" -c Release -o
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 # Copia os arquivos publicados da etapa de build para a pasta de trabalho do runtime
-COPY --from=build /src/bin/Release/net10.0/publish .
+COPY --from=build /app/publish .
 
 # Define a porta que o container irá expor
 EXPOSE 8080

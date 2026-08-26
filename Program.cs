@@ -1,8 +1,11 @@
+using Microsoft.EntityFrameworkCore;
+using payment_Gateway_API.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
@@ -10,9 +13,19 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+
+    app.UseSwaggerUI(settings => settings.SwaggerEndpoint("/openapi/v1.json", "Payment Gateway API v1"));
 }
 
+// Redireciona HTTP para HTTPS
 app.UseHttpsRedirection();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
+}
+
 
 var summaries = new[]
 {

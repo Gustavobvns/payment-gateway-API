@@ -1,5 +1,3 @@
-version: '3.8'
-
 services: 
 
 # Banco de Dados Local no Docker Compose para testes
@@ -14,6 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
       
   payment-gateway-api:
     build: 
@@ -26,7 +29,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=payment_db;Username=postgres;Password=postgrespassword;
     depends_on:
-      - postgres-db
+      postgres-db:
+        condition: service_healthy
 
 # Persistencia de dados local do Postgres
 volumes:

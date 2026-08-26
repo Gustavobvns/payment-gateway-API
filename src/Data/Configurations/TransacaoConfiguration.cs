@@ -15,20 +15,19 @@ public class TransacoesConfiguration : IEntityTypeConfiguration<Transacoes>
         builder.Property(t => t.Valor).IsRequired().HasColumnType("decimal(18,2)");
         builder.Property(t => t.DataTransacao).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        builder.HasIndex(t => t.CodigoPagamentoId).IsUnique();
-        // Configuração do relacionamento com a entidade Conta (ContaOrigem)
+       builder.HasIndex(t => t.CodigoPagamentoId).IsUnique();
+
         builder.HasOne(t => t.ContaOrigem)
                .WithMany()
                .HasForeignKey(t => t.ContaOrigemId)
                .OnDelete(DeleteBehavior.Restrict);
 
-        // Configuração do relacionamento com a entidade Conta (ContaDestino)
         builder.HasOne(t => t.ContaDestino)
                .WithMany()
                .HasForeignKey(t => t.ContaDestinoId)
                .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(t => t.CodigoPagamentoId)
+       builder.HasOne(t => t.CodigoPagamento)
                .WithOne()
                .HasForeignKey<Transacoes>(t => t.CodigoPagamentoId)
                .IsRequired(false)
