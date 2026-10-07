@@ -1,5 +1,4 @@
-namespace payment_Gateway_API.Models;
-
+namespace payment_gateway_API.src.Models;
 public class Contas
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();

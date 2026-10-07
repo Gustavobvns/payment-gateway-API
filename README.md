@@ -6,7 +6,7 @@ API REST de carteira digital desenvolvida em .NET para demonstrar autenticação
 
 # 📍 Status do Projeto e Estratégia de Desenvolvimento
 
-> **Status Atual:** 🛠️ Em Desenvolvimento (Fase de Implementação das Slices)
+> **Status Atual:** 🛠️ Em Desenvolvimento (Fase de Implementação)
 
 A evolução do projeto segue a arquitetura **Vertical Slice**, onde cada funcionalidade é construída de forma isolada, contendo seus próprios contratos (DTOs), regras de negócio (Services), rotas (Endpoints) e testes.
 
@@ -50,7 +50,11 @@ Este projeto representa o *core* de movimentações financeiras de uma carteira 
   - armazenamento seguro da senha via hash
 - Login com geração de token JWT
 - Proteção de endpoints financeiros com autenticação
-- CRUD de todos os dados de usuario autenticado 
+- CRUD do perfil do usuário autenticado:
+  - consulta dos dados e saldo
+  - atualização de nome, documento e e-mail
+  - alteração de senha
+  - desativação lógica da conta
 
 ### 2) Transfers (Transferências Diretas)
 - Transferência P2P entre contas
@@ -123,7 +127,11 @@ payment-gateway-API/
     │
     ├── Features/
     │   ├── Auth/
+    |   |   ├── Services/
+    |   |   ├── Register/
+    |   |   ├── Login/
     │   ├── Transfers/
+    |   ├── Users/
     │   ├── Payments/
     │   └── Ledger/
     │
@@ -169,15 +177,19 @@ Authorization: Bearer {seu_token}
 
 ## 📡 Endpoints principais
 
-| Feature   | Método | Rota                    | Descrição |
-|-----------|--------|-------------------------|-----------|
-| Auth      | POST   | `/auth/register`        | Cadastro de usuário |
-| Auth      | POST   | `/auth/login`           | Login e geração de JWT |
-| Transfers | POST   | `/transfers`            | Transferência P2P |
-| Payments  | POST   | `/payments`             | Geração de cobrança |
-| Payments  | GET    | `/payments/{codigo}`    | Consulta de cobrança |
-| Payments  | POST   | `/payments/{codigo}/pay`| Pagamento de cobrança |
-| Ledger    | GET    | `/ledger`               | Extrato da conta autenticada |
+| Feature   | Método | Rota                       | Descrição |
+|-----------|--------|----------------------------|-----------|
+| Auth      | POST   | `/auth/register`           | Cadastro de usuário e abertura automática de conta |
+| Auth      | POST   | `/auth/login`              | Login e geração de JWT |
+| Users     | GET    | `/users/me`                | Consulta do perfil e saldo da conta autenticada |
+| Users     | PUT    | `/users/me`                | Atualização do perfil do usuário autenticado |
+| Users     | PATCH  | `/users/change-password`   | Alteração de senha do usuário logado |
+| Users     | DELETE | `/users/me`                | Desativação lógica do usuário autenticado |
+| Transfers | POST   | `/transfers/{idrecebedor}` | Transferência P2P |
+| Payments  | POST   | `/payments`                | Geração de cobrança |
+| Payments  | GET    | `/payments/{codigo}`       | Consulta de cobrança |
+| Payments  | POST   | `/payments/{codigo}/pay`   | Pagamento de cobrança |
+| Ledger    | GET    | `/ledger`                  | Extrato da conta autenticada |
 
 ---
 
@@ -201,6 +213,7 @@ Authorization: Bearer {seu_token}
 - Débito e crédito ocorrem na mesma transação de banco (ACID)
 - Cobrança paga não pode ser liquidada novamente
 - Juros de atraso são aplicados conforme regra de `JurosDiario`
+- A exclusão de usuário é lógica: o usuário é desativado para preservar a conta e o histórico financeiro
 
 ---
 

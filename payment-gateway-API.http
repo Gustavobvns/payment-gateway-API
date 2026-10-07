@@ -1,6 +1,44 @@
 @payment_gateway_API_HostAddress = http://localhost:5201
+@token = SEU_TOKEN_JWT
+@contentType = application/json
 
-GET {{payment_gateway_API_HostAddress}}/weatherforecast/
+### Cadastro
+POST {{payment_gateway_API_HostAddress}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "nome": "Gustavo",
+  "documento": "12345678900",
+  "email": "gustavo@example.com",
+  "senha": "Senha-Forte-123"
+}
+
+### Consulta do próprio perfil
+GET {{payment_gateway_API_HostAddress}}/users/me
+Authorization: Bearer {{token}}
 Accept: application/json
 
-###
+### Atualização completa do próprio perfil
+PUT {{payment_gateway_API_HostAddress}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "nome": "Gustavo Atualizado",
+  "documento": "12345678900",
+  "email": "gustavo.atualizado@example.com"
+}
+
+### Alteração de senha
+PATCH {{payment_gateway_API_HostAddress}}/users/change-password
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "senhaAtual": "Senha-Forte-123",
+  "novaSenha": "Nova-Senha-456"
+}
+
+### Desativação do próprio usuário
+DELETE {{payment_gateway_API_HostAddress}}/users/me
+Authorization: Bearer {{token}}

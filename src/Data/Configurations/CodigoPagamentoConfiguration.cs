@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using payment_Gateway_API.Models;
+using payment_gateway_API.src.Models;
 
-namespace payment_Gateway_API.Data.Configurations;
+namespace payment_gateway_API.src.Data.Configurations;
 
 public class CodigosPagamentoConfiguration : IEntityTypeConfiguration<CodigosPagamento>
 {

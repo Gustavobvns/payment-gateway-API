@@ -1,2 +1,6 @@
 <Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/payment-gateway-API.Tests.csproj" />
+  </Folder>
+  <Project Path="payment-gateway-API.csproj" />
 </Solution>
