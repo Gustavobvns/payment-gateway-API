@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using payment_gateway_API.src.Auth.Services;
+using payment_gateway_API.src.Features.Financial;
 
 namespace payment_gateway_API.src.Infrastructure;
 
@@ -23,6 +24,14 @@ public sealed class ApiExceptionHandler(
 				(StatusCodes.Status401Unauthorized, "Não autorizado", "As credenciais informadas são inválidas."),
 			UserNotFoundException =>
 				(StatusCodes.Status404NotFound, "Usuário não encontrado", "O usuário informado não existe."),
+			FinancialValidationException =>
+				(StatusCodes.Status400BadRequest, "Requisição inválida", exception.Message),
+			FinancialNotFoundException =>
+				(StatusCodes.Status404NotFound, "Recurso não encontrado", exception.Message),
+			InsufficientBalanceException =>
+				(StatusCodes.Status409Conflict, "Saldo insuficiente", "A conta não possui saldo suficiente."),
+			PaymentAlreadyPaidException =>
+				(StatusCodes.Status409Conflict, "Cobrança já paga", "A cobrança já foi liquidada."),
 			_ =>
 				(StatusCodes.Status500InternalServerError, "Erro interno", "Ocorreu um erro inesperado."),
 		};

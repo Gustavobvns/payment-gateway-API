@@ -6,9 +6,6 @@ using payment_gateway_API.src.Models;
 
 namespace payment_gateway_API.src.Auth.Services;
 
-/// <summary>
-/// Centraliza a montagem da resposta que contém o JWT e sua data de expiração.
-/// </summary>
 public sealed class AuthResponseFactory(
 	ITokenService tokenService,
 	IOptions<JwtOptions> jwtOptions)

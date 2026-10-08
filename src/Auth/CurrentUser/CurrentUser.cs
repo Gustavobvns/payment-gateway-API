@@ -2,7 +2,6 @@ using System.Security.Claims;
 
 namespace payment_gateway_API.src.Auth.CurrentUser;
 
-/// Adapta os claims já validados pelo middleware JWT para a aplicação.
 public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {
 	private ClaimsPrincipal Principal =>

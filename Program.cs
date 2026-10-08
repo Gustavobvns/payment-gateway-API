@@ -12,6 +12,9 @@ using payment_gateway_API.src.Auth.Services;
 using payment_gateway_API.src.Auth.Users;
 using payment_gateway_API.src.Data;
 using payment_gateway_API.src.Infrastructure;
+using payment_gateway_API.src.Features.Ledger;
+using payment_gateway_API.src.Features.Payments;
+using payment_gateway_API.src.Features.Transfers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +28,9 @@ builder.Services.AddScoped<IRegisterService, RegisterService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IChangePasswordService, ChangePasswordService>();
+builder.Services.AddScoped<ITransferService, TransferService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<ILedgerService, LedgerService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddProblemDetails();
@@ -77,6 +83,9 @@ app.UseAuthorization();
 app.MapRegisterEndpoints();
 app.MapLoginEndpoints();
 app.MapUserEndpoints();
+app.MapTransferEndpoints();
+app.MapPaymentEndpoints();
+app.MapLedgerEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {

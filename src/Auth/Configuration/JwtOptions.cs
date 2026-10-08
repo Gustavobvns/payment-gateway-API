@@ -1,6 +1,5 @@
 namespace payment_gateway_API.src.Auth.Configuration;
 
-/// Configurações usadas para emitir e validar tokens JWT.
 public sealed class JwtOptions
 {
 	public const string SectionName = "Jwt";
@@ -10,7 +9,6 @@ public sealed class JwtOptions
 	public string Audience { get; init; } = string.Empty;
 	public int ExpirationMinutes { get; init; } = 60;
 
-	/// Mantém a validação da configuração em um único ponto para emissão e middleware.
 	public bool IsValid() =>
 		!string.IsNullOrWhiteSpace(Key) &&
 		Key.Length >= 32 &&

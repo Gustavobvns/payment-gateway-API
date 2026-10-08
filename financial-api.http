@@ -1,0 +1,39 @@
+@payment_gateway_API_HostAddress = http://localhost:5201
+@token = SEU_TOKEN_JWT
+@receiverAccountId = CONTA_RECEBEDORA_GUID
+@destinationAccountId = CONTA_DESTINO_GUID
+@paymentCode = CODIGO_DA_COBRANCA
+
+### Transferência para outra conta
+POST {{payment_gateway_API_HostAddress}}/transfers/{{destinationAccountId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "valor": 25.00
+}
+
+### Criação de cobrança
+POST {{payment_gateway_API_HostAddress}}/payments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contaRecebedoraId": "{{receiverAccountId}}",
+  "valorOriginal": 50.00,
+  "dataVencimento": "2026-12-31",
+  "jurosDiario": 1.50
+}
+
+### Consulta de cobrança
+GET {{payment_gateway_API_HostAddress}}/payments/{{paymentCode}}
+Accept: application/json
+
+### Pagamento de cobrança
+POST {{payment_gateway_API_HostAddress}}/payments/{{paymentCode}}/pay
+Authorization: Bearer {{token}}
+
+### Extrato paginado
+GET {{payment_gateway_API_HostAddress}}/ledger?page=1&pageSize=20
+Authorization: Bearer {{token}}
+Accept: application/json

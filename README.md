@@ -63,6 +63,7 @@ Este projeto representa o *core* de movimentações financeiras de uma carteira 
   - conta de destino existente
   - saldo suficiente na conta de origem
 - Operação transacional (ACID)
+- Registro de Leadger
 
 ### 3) Payments (Cobranças)
 - Geração de código de cobrança com:
@@ -77,7 +78,7 @@ Este projeto representa o *core* de movimentações financeiras de uma carteira 
 - Pagamento de cobrança usando o valor atualizado da consulta
 
 ### 4) Ledger (Extrato)
-- Consulta do histórico imutável de transações da conta autenticada
+- Consulta paginada do histórico imutável de transações da conta autenticada
 
 ---
 
@@ -85,7 +86,7 @@ Este projeto representa o *core* de movimentações financeiras de uma carteira 
 
 ```text
 Usuarios:
-- Id (GRIDv7)
+- Id (GUID v7)
 - Nome
 - Documento (Unique)
 - Email (Unique)
@@ -93,12 +94,12 @@ Usuarios:
 - ativo
 
 Contas:
-- Id (GRIDv7)
+- Id (GUID v7)
 - UsuarioId (FK)
 - Saldo (Numeric)
 
 CodigosPagamento:
-- Id (GRIDv7)
+- Id (GUID v7)
 - CodigoPagamentoHash (Unique)
 - ContaGeradoraId (FK)
 - ValorOriginal
@@ -107,12 +108,12 @@ CodigosPagamento:
 - Status
 
 Transacoes:
-- Id (GRIDv7)
+- Id (GUID v7)
 - ContaOrigemId (FK)
 - ContaDestinoId (FK)
 - Valor
 - CodigoPagamentoId (FK, Nullable)
-- DataHora
+- DataTransacao
 ```
 
 ---
@@ -170,7 +171,7 @@ docker compose up -d --build
 Após login, utilize o token JWT no cabeçalho:
 
 ```http
-Authorization: Bearer {seu_token}
+Authorization: Bearer SEU_TOKEN_JWT
 ```
 
 ---
@@ -185,7 +186,7 @@ Authorization: Bearer {seu_token}
 | Users     | PUT    | `/users/me`                | Atualização do perfil do usuário autenticado |
 | Users     | PATCH  | `/users/change-password`   | Alteração de senha do usuário logado |
 | Users     | DELETE | `/users/me`                | Desativação lógica do usuário autenticado |
-| Transfers | POST   | `/transfers/{idrecebedor}` | Transferência P2P |
+| Transfers | POST   | `/transfers/{destinationAccountId}` | Transferência P2P |
 | Payments  | POST   | `/payments`                | Geração de cobrança |
 | Payments  | GET    | `/payments/{codigo}`       | Consulta de cobrança |
 | Payments  | POST   | `/payments/{codigo}/pay`   | Pagamento de cobrança |
@@ -225,22 +226,22 @@ A suíte de testes foi projetada com foco na integridade de dados e na validaç�
 * **Framework Principal:** `xUnit`
 * **Mocking & Mocks:** `Moq` (para isolamento de dependências e regras de serviço)
 * **Asserções:** `FluentAssertions` (para leitura declarativa e expressiva das validações)
-* **Testes de Integração:** `Microsoft.AspNetCore.Mvc.Testing` (`WebApplicationFactory`)
+* **Persistência de teste:** SQLite em memória para isolar serviços e regras
 
 ### 🎯 Matriz de principais Cobertura e Cenários Críticos
 
 | Nível | Componente / Feature | Cenários Validados |
 | :--- | :--- | :--- |
 | **Unitário** | `PaymentService` | Cálculo exato de juros diários por atraso, pagamento sem acréscimo dentro do prazo e rejeição de cobranças já pagas. |
-| **Unitário** | `TransferService` | Débito/crédito simultâneo em transferência P2P, falha imediata por saldo insuficiente e *Rollback* em exceções. |
+| **Unitário** | `TransferService` | Débito/crédito simultâneo em transferência P2P, falha por saldo insuficiente e registro no ledger. |
+| **Unitário** | `LedgerService` | Consulta autenticada, paginação e distinção entre entrada e saída. |
 | **Unitário** | `AuthService` | Verificação de hash de senha (`BCrypt`), geração do JWT Token com *claims* e expiração. |
-| **Integração** | Endpoints API | Fluxo E2E: Cadastro → Login (Extração do Bearer Token) → Transferência P2P Autenticada → Atualização do Saldo. |
 
 ---
 
 ### 🚀 Como Executar os Testes
 
-Executar toda a suíte de testes unitários e de integração localmente:
+Executar toda a suíte de testes unitários localmente:
 
 ```bash
 # Executar todos os testes da solução
@@ -254,9 +255,11 @@ dotnet test --logger "console;verbosity=detailed"
 
 ## ⚠️ Limitações atuais (projeto em evolução)
 
-- Projeto em fase de concepção e desenvolvimento
+- Idempotência explícita e testes de concorrência das operações financeiras ainda são próximos passos
+- O cálculo de juros atual utiliza acréscimo fixo por dia de atraso (`JurosDiario`)
+- Testes HTTP de integração com PostgreSQL ainda serão adicionados
 - Endpoints e contratos podem sofrer ajustes durante evolução do domínio
-- Foco atual em robustez de regras financeiras e qualidade de código
+- Foco atual em arquitetura, robustez de regras financeiras e qualidade de código
 
 ---
 
