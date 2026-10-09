@@ -4,14 +4,6 @@ API REST de carteira digital desenvolvida em .NET para demonstrar autenticação
 
 ---
 
-# 📍 Status do Projeto e Estratégia de Desenvolvimento
-
-> **Status Atual:** 🛠️ Em Desenvolvimento (Fase de Implementação)
-
-A evolução do projeto segue a arquitetura **Vertical Slice**, onde cada funcionalidade é construída de forma isolada, contendo seus próprios contratos (DTOs), regras de negócio (Services), rotas (Endpoints) e testes.
-
----
-
 ## 📌 Visão Geral
 
 Este projeto representa o *core* de movimentações financeiras de uma carteira digital, incluindo:
@@ -289,5 +281,8 @@ dotnet test --filter "FullyQualifiedName~ApiIntegrationTests"
 
 ## 👨‍💻 Autor
 
-**Gustavo**  
+**Gustavo Beirão**
 GitHub: [@Gustavobvns](https://github.com/Gustavobvns)
+Linkedin: https://linkedin/in/gustavo-beirão
+Email: gustavobvns@gmail.com
+Cel: (21) 99476-4457
