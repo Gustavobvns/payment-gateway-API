@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
     public DbSet<Contas> Contas => Set<Contas>();
     public DbSet<CodigosPagamento> CodigosPagamento => Set<CodigosPagamento>();
     public DbSet<Transacoes> Transacoes => Set<Transacoes>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

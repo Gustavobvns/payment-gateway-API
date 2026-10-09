@@ -83,8 +83,6 @@ public sealed class FinancialServicesTests
 
 		var entries = await new LedgerService(database).GetAsync(
 			destination.User.Id,
-			1,
-			20,
 			CancellationToken.None);
 
 		entries.Should().ContainSingle();

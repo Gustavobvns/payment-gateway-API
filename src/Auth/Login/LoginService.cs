@@ -20,6 +20,11 @@ public sealed class LoginService(
 			throw new AuthValidationException("Email e senha são obrigatórios.");
 		}
 
+		if (request.Email.Trim().Length > 100)
+		{
+			throw new AuthValidationException("O email deve possuir no máximo 100 caracteres.");
+		}
+
 		var email = request.Email.Trim().ToLowerInvariant();
 		var usuario = await dbContext.Usuarios
 			.SingleOrDefaultAsync(user => user.Email == email, cancellationToken);

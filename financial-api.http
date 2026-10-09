@@ -3,10 +3,13 @@
 @receiverAccountId = CONTA_RECEBEDORA_GUID
 @destinationAccountId = CONTA_DESTINO_GUID
 @paymentCode = CODIGO_DA_COBRANCA
+@transferIdempotencyKey = transferencia-exemplo-001
+@paymentIdempotencyKey = pagamento-exemplo-001
 
 ### Transferência para outra conta
 POST {{payment_gateway_API_HostAddress}}/transfers/{{destinationAccountId}}
 Authorization: Bearer {{token}}
+Idempotency-Key: {{transferIdempotencyKey}}
 Content-Type: application/json
 
 {
@@ -16,6 +19,7 @@ Content-Type: application/json
 ### Criação de cobrança
 POST {{payment_gateway_API_HostAddress}}/payments
 Authorization: Bearer {{token}}
+Idempotency-Key: {{paymentIdempotencyKey}}
 Content-Type: application/json
 
 {
@@ -32,8 +36,9 @@ Accept: application/json
 ### Pagamento de cobrança
 POST {{payment_gateway_API_HostAddress}}/payments/{{paymentCode}}/pay
 Authorization: Bearer {{token}}
+Idempotency-Key: {{paymentIdempotencyKey}}-pay
 
-### Extrato paginado
-GET {{payment_gateway_API_HostAddress}}/ledger?page=1&pageSize=20
+### Extrato completo
+GET {{payment_gateway_API_HostAddress}}/ledger
 Authorization: Bearer {{token}}
 Accept: application/json

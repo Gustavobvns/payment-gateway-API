@@ -8,5 +8,6 @@ public class CodigosPagamento
     public DateOnly DataVencimento { get; set; }
     public decimal JurosDiario { get; set; }
     public bool Status { get; set; }
+    public uint Version { get; set; }
     public Contas ContaGeradora { get; set; } = null!;
 }

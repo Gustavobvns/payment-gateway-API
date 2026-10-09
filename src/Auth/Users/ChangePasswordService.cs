@@ -3,6 +3,7 @@ using payment_gateway_API.src.Auth.Contracts.Users;
 using payment_gateway_API.src.Auth.Infrastructure;
 using payment_gateway_API.src.Auth.Services;
 using payment_gateway_API.src.Data;
+using payment_gateway_API.src.Infrastructure;
 
 namespace payment_gateway_API.src.Auth.Users;
 
@@ -20,10 +21,7 @@ public sealed class ChangePasswordService(
 			throw new AuthValidationException("A senha atual e a nova senha são obrigatórias.");
 		}
 
-		if (request.NovaSenha.Length < 8)
-		{
-			throw new AuthValidationException("A nova senha deve possuir pelo menos 8 caracteres.");
-		}
+		InputValidation.ValidatePassword(request.NovaSenha);
 
 		var usuario = await dbContext.Usuarios
 			.SingleOrDefaultAsync(user => user.Id == userId, cancellationToken)

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using payment_gateway_API.src.Auth.Contracts.Users;
 using payment_gateway_API.src.Auth.Services;
 using payment_gateway_API.src.Data;
+using payment_gateway_API.src.Infrastructure;
 
 namespace payment_gateway_API.src.Auth.Users;
 
@@ -85,11 +86,6 @@ public sealed class UserProfileService(AppDbContext dbContext) : IUserProfileSer
 
 	private static void ValidateProfile(UpdateUserRequest request)
 	{
-		if (string.IsNullOrWhiteSpace(request.Nome) ||
-			string.IsNullOrWhiteSpace(request.Documento) ||
-			string.IsNullOrWhiteSpace(request.Email))
-		{
-			throw new AuthValidationException("Nome, documento e email são obrigatórios.");
-		}
+		InputValidation.ValidatePerson(request.Nome, request.Documento, request.Email);
 	}
 }

@@ -5,7 +5,8 @@ public interface IPaymentService
 	Task<PaymentResponse> CreateAsync(
 		Guid userId,
 		CreatePaymentRequest request,
-		CancellationToken cancellationToken);
+	string idempotencyKey,
+	CancellationToken cancellationToken);
 
 	Task<PaymentResponse> GetAsync(
 		string code,
@@ -14,5 +15,6 @@ public interface IPaymentService
 	Task<PaymentResult> PayAsync(
 		Guid userId,
 		string code,
-		CancellationToken cancellationToken);
+	string idempotencyKey,
+	CancellationToken cancellationToken);
 }

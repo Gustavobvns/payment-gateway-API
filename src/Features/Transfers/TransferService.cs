@@ -1,22 +1,41 @@
 using Microsoft.EntityFrameworkCore;
 using payment_gateway_API.src.Data;
 using payment_gateway_API.src.Features.Financial;
+using payment_gateway_API.src.Infrastructure;
 using payment_gateway_API.src.Models;
 
 namespace payment_gateway_API.src.Features.Transfers;
 
-public sealed class TransferService(AppDbContext dbContext) : ITransferService
+public sealed class TransferService(AppDbContext dbContext, IdempotencyService idempotencyService) : ITransferService
 {
+	public TransferService(AppDbContext dbContext)
+		: this(dbContext, new IdempotencyService(dbContext))
+	{
+	}
+
+	public Task<TransferResponse> TransferAsync(
+		Guid userId,
+		Guid destinationAccountId,
+		TransferRequest request,
+		CancellationToken cancellationToken) =>
+		TransferAsync(userId, destinationAccountId, request, Guid.NewGuid().ToString(), cancellationToken);
+
 	public async Task<TransferResponse> TransferAsync(
 		Guid userId,
 		Guid destinationAccountId,
 		TransferRequest request,
+		string idempotencyKey,
 		CancellationToken cancellationToken)
 	{
-		if (request.Valor <= 0)
+		ValidateIdempotencyKey(idempotencyKey);
+		var previous = await idempotencyService.GetAsync<TransferResponse>(
+			userId, "transfer", idempotencyKey, cancellationToken);
+		if (previous is not null)
 		{
-			throw new FinancialValidationException("O valor da transferência deve ser maior que zero.");
+			return previous;
 		}
+
+		InputValidation.ValidateMoney(request.Valor, "O valor da transferência");
 
 		var sourceAccount = await dbContext.Contas
 			.Include(account => account.Usuario)
@@ -45,7 +64,9 @@ public sealed class TransferService(AppDbContext dbContext) : ITransferService
 
 		await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 		sourceAccount.Saldo -= request.Valor;
+		sourceAccount.Version++;
 		destinationAccount.Saldo += request.Valor;
+		destinationAccount.Version++;
 
 		var transfer = new Transacoes
 		{
@@ -56,14 +77,31 @@ public sealed class TransferService(AppDbContext dbContext) : ITransferService
 		};
 
 		dbContext.Transacoes.Add(transfer);
-		await dbContext.SaveChangesAsync(cancellationToken);
-		await transaction.CommitAsync(cancellationToken);
+		try
+		{
+			await dbContext.SaveChangesAsync(cancellationToken);
+			await transaction.CommitAsync(cancellationToken);
+		}
+		catch (DbUpdateConcurrencyException)
+		{
+			throw new FinancialConcurrencyException();
+		}
 
-		return new TransferResponse(
+		var response = new TransferResponse(
 			transfer.Id,
 			transfer.ContaOrigemId,
 			transfer.ContaDestinoId,
 			transfer.Valor,
 			new DateTimeOffset(transfer.DataTransacao, TimeSpan.Zero));
+		return await idempotencyService.SaveOrGetAsync(
+			userId, "transfer", idempotencyKey, response, cancellationToken);
+	}
+
+	private static void ValidateIdempotencyKey(string key)
+	{
+		if (string.IsNullOrWhiteSpace(key) || key.Length > 200)
+		{
+			throw new FinancialValidationException("O header Idempotency-Key é obrigatório e deve ter até 200 caracteres.");
+		}
 	}
 }

@@ -8,13 +8,8 @@ public sealed class LedgerService(AppDbContext dbContext) : ILedgerService
 {
 	public async Task<IReadOnlyList<LedgerEntryResponse>> GetAsync(
 		Guid userId,
-		int page,
-		int pageSize,
 		CancellationToken cancellationToken)
 	{
-		page = Math.Max(page, 1);
-		pageSize = Math.Clamp(pageSize, 1, 100);
-
 		var accountId = await dbContext.Contas
 			.Where(account => account.UsuarioId == userId)
 			.Select(account => (Guid?)account.Id)
@@ -28,8 +23,6 @@ public sealed class LedgerService(AppDbContext dbContext) : ILedgerService
 				transaction.ContaDestinoId == accountId)
 			.OrderByDescending(transaction => transaction.DataTransacao)
 			.ThenByDescending(transaction => transaction.Id)
-			.Skip((page - 1) * pageSize)
-			.Take(pageSize)
 			.Select(transaction => new LedgerEntryResponse(
 				transaction.Id,
 				transaction.ContaDestinoId == accountId ? "Entrada" : "Saida",

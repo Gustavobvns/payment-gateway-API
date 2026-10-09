@@ -3,21 +3,46 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using payment_gateway_API.src.Data;
 using payment_gateway_API.src.Features.Financial;
+using payment_gateway_API.src.Infrastructure;
 using payment_gateway_API.src.Models;
 
 namespace payment_gateway_API.src.Features.Payments;
 
-public sealed class PaymentService(AppDbContext dbContext) : IPaymentService
+public sealed class PaymentService(AppDbContext dbContext, IdempotencyService idempotencyService) : IPaymentService
 {
+	public PaymentService(AppDbContext dbContext)
+		: this(dbContext, new IdempotencyService(dbContext))
+	{
+	}
+
+	public Task<PaymentResponse> CreateAsync(
+		Guid userId,
+		CreatePaymentRequest request,
+		CancellationToken cancellationToken) =>
+		CreateAsync(userId, request, Guid.NewGuid().ToString(), cancellationToken);
+
+	public Task<PaymentResult> PayAsync(
+		Guid userId,
+		string code,
+		CancellationToken cancellationToken) =>
+		PayAsync(userId, code, Guid.NewGuid().ToString(), cancellationToken);
+
 	public async Task<PaymentResponse> CreateAsync(
 		Guid userId,
 		CreatePaymentRequest request,
+		string idempotencyKey,
 		CancellationToken cancellationToken)
 	{
-		if (request.ValorOriginal <= 0 || request.JurosDiario < 0)
+		ValidateIdempotencyKey(idempotencyKey);
+		var previous = await idempotencyService.GetAsync<PaymentResponse>(
+			userId, "payment-create", idempotencyKey, cancellationToken);
+		if (previous is not null)
 		{
-			throw new FinancialValidationException("O valor deve ser maior que zero e os juros não podem ser negativos.");
+			return previous;
 		}
+
+		InputValidation.ValidateMoney(request.ValorOriginal, "O valor");
+		InputValidation.ValidateNonNegativeMoney(request.JurosDiario, "Os juros");
 
 		if (request.DataVencimento < DateOnly.FromDateTime(DateTime.UtcNow))
 		{
@@ -50,7 +75,9 @@ public sealed class PaymentService(AppDbContext dbContext) : IPaymentService
 		dbContext.CodigosPagamento.Add(payment);
 		await dbContext.SaveChangesAsync(cancellationToken);
 
-		return ToResponse(payment, code);
+		var response = ToResponse(payment, code);
+		return await idempotencyService.SaveOrGetAsync(
+			userId, "payment-create", idempotencyKey, response, cancellationToken);
 	}
 
 	public async Task<PaymentResponse> GetAsync(
@@ -73,8 +100,17 @@ public sealed class PaymentService(AppDbContext dbContext) : IPaymentService
 	public async Task<PaymentResult> PayAsync(
 		Guid userId,
 		string code,
+		string idempotencyKey,
 		CancellationToken cancellationToken)
 	{
+		ValidateIdempotencyKey(idempotencyKey);
+		var previous = await idempotencyService.GetAsync<PaymentResult>(
+			userId, "payment-pay", idempotencyKey, cancellationToken);
+		if (previous is not null)
+		{
+			return previous;
+		}
+
 		if (string.IsNullOrWhiteSpace(code))
 		{
 			throw new FinancialValidationException("O código da cobrança é obrigatório.");
@@ -115,8 +151,11 @@ public sealed class PaymentService(AppDbContext dbContext) : IPaymentService
 
 		await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 		payer.Saldo -= amount;
+		payer.Version++;
 		receiver.Saldo += amount;
+		receiver.Version++;
 		payment.Status = true;
+		payment.Version++;
 
 		var ledgerEntry = new Transacoes
 		{
@@ -127,14 +166,31 @@ public sealed class PaymentService(AppDbContext dbContext) : IPaymentService
 			DataTransacao = DateTime.UtcNow
 		};
 		dbContext.Transacoes.Add(ledgerEntry);
-		await dbContext.SaveChangesAsync(cancellationToken);
-		await transaction.CommitAsync(cancellationToken);
+		try
+		{
+			await dbContext.SaveChangesAsync(cancellationToken);
+			await transaction.CommitAsync(cancellationToken);
+		}
+		catch (DbUpdateConcurrencyException)
+		{
+			throw new FinancialConcurrencyException();
+		}
 
-		return new PaymentResult(
+		var result = new PaymentResult(
 			code,
 			amount,
 			ledgerEntry.Id,
 			new DateTimeOffset(ledgerEntry.DataTransacao, TimeSpan.Zero));
+		return await idempotencyService.SaveOrGetAsync(
+			userId, "payment-pay", idempotencyKey, result, cancellationToken);
+	}
+
+	private static void ValidateIdempotencyKey(string key)
+	{
+		if (string.IsNullOrWhiteSpace(key) || key.Length > 200)
+		{
+			throw new FinancialValidationException("O header Idempotency-Key é obrigatório e deve ter até 200 caracteres.");
+		}
 	}
 
 	private static PaymentResponse ToResponse(CodigosPagamento payment, string code) =>

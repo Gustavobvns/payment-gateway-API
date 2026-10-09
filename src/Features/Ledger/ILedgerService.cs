@@ -4,7 +4,5 @@ public interface ILedgerService
 {
 	Task<IReadOnlyList<LedgerEntryResponse>> GetAsync(
 		Guid userId,
-		int page,
-		int pageSize,
 		CancellationToken cancellationToken);
 }

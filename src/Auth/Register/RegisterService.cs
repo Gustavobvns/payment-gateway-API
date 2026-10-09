@@ -5,6 +5,7 @@ using payment_gateway_API.src.Auth.Infrastructure;
 using payment_gateway_API.src.Auth.Services;
 using payment_gateway_API.src.Data;
 using payment_gateway_API.src.Models;
+using payment_gateway_API.src.Infrastructure;
 
 namespace payment_gateway_API.src.Auth.Register;
 
@@ -71,17 +72,7 @@ public sealed class RegisterService(
 
 	private static void ValidateRegistration(RegisterRequest request)
 	{
-		if (string.IsNullOrWhiteSpace(request.Nome) ||
-			string.IsNullOrWhiteSpace(request.Documento) ||
-			string.IsNullOrWhiteSpace(request.Email) ||
-			string.IsNullOrWhiteSpace(request.Senha))
-		{
-			throw new AuthValidationException("Nome, documento, email e senha são obrigatórios.");
-		}
-
-		if (request.Senha.Length < 8)
-		{
-			throw new AuthValidationException("A senha deve possuir pelo menos 8 caracteres.");
-		}
+		InputValidation.ValidatePerson(request.Nome, request.Documento, request.Email);
+		InputValidation.ValidatePassword(request.Senha);
 	}
 }

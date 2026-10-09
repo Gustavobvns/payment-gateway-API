@@ -18,6 +18,8 @@ public sealed class ApiExceptionHandler(
 		{
 			AuthValidationException =>
 				(StatusCodes.Status400BadRequest, "Requisição inválida", exception.Message),
+			InvalidInputException =>
+				(StatusCodes.Status400BadRequest, "Requisição inválida", exception.Message),
 			DuplicateUserException =>
 				(StatusCodes.Status409Conflict, "Conflito", exception.Message),
 			InvalidCredentialsException =>
@@ -32,6 +34,8 @@ public sealed class ApiExceptionHandler(
 				(StatusCodes.Status409Conflict, "Saldo insuficiente", "A conta não possui saldo suficiente."),
 			PaymentAlreadyPaidException =>
 				(StatusCodes.Status409Conflict, "Cobrança já paga", "A cobrança já foi liquidada."),
+			FinancialConcurrencyException =>
+				(StatusCodes.Status409Conflict, "Conflito de concorrência", "A operação foi alterada simultaneamente. Tente novamente."),
 			_ =>
 				(StatusCodes.Status500InternalServerError, "Erro interno", "Ocorreu um erro inesperado."),
 		};

@@ -5,5 +5,6 @@ public class Contas
 
     public Guid UsuarioId { get; set; }
     public decimal Saldo { get; set; }
+    public uint Version { get; set; }
     public Usuarios Usuario { get; set; } = null!;
 }

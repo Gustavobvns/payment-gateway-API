@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
 using payment_gateway_API.src.Auth.Configuration;
 using payment_gateway_API.src.Auth.CurrentUser;
 using payment_gateway_API.src.Auth.Infrastructure;
@@ -19,6 +20,25 @@ using payment_gateway_API.src.Features.Transfers;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen(options =>
+{
+	options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+	{
+		Name = "Authorization",
+		Type = SecuritySchemeType.Http,
+		Scheme = "bearer",
+		BearerFormat = "JWT",
+		In = ParameterLocation.Header,
+		Description = "Informe o token JWT no formato: Bearer {token}"
+	});
+	options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+	{
+		{
+			new OpenApiSecuritySchemeReference("Bearer", document, null),
+			new List<string>()
+		}
+	});
+});
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -31,10 +51,13 @@ builder.Services.AddScoped<IChangePasswordService, ChangePasswordService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ILedgerService, LedgerService>();
+builder.Services.AddScoped<IdempotencyService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddHealthChecks()
+	.AddCheck<DatabaseHealthCheck>("postgresql");
 
 // O binding tipado impede que emissão e validação usem configurações diferentes.
 builder.Services.AddOptions<JwtOptions>()
@@ -69,15 +92,15 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-
-    app.UseSwaggerUI(settings => settings.SwaggerEndpoint("/openapi/v1.json", "Payment Gateway API v1"));
+	app.UseSwagger();
+	app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHealthChecks("/health");
 
 // Cada slice registra suas próprias rotas; Program.cs fica apenas como composição da aplicação.
 app.MapRegisterEndpoints();
@@ -94,3 +117,5 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+public partial class Program;

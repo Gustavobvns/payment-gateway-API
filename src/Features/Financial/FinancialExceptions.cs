@@ -7,3 +7,5 @@ public sealed class FinancialNotFoundException(string message) : Exception(messa
 public sealed class InsufficientBalanceException : Exception;
 
 public sealed class PaymentAlreadyPaidException : Exception;
+
+public sealed class FinancialConcurrencyException : Exception;

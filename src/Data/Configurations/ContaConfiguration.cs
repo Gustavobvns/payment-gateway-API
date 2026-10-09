@@ -10,7 +10,10 @@ public class ContasConfiguration : IEntityTypeConfiguration<Contas>
     {
         builder.ToTable("Contas");
         builder.HasKey(c => c.Id);
-        builder.HasIndex(c => c.UsuarioId);
+        builder.HasIndex(c => c.UsuarioId).IsUnique();
+        builder.Property(c => c.Version)
+               .IsConcurrencyToken()
+               .HasDefaultValue(1u);
         builder.Property(c => c.Saldo).IsRequired().HasPrecision(18, 2).HasDefaultValue(0);
         builder.HasOne(c => c.Usuario)
                .WithMany()

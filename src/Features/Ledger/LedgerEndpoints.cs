@@ -17,8 +17,6 @@ public static class LedgerEndpoints
 	private static async Task<IResult> GetAsync(
 		ICurrentUser currentUser,
 		ILedgerService service,
-		int page = 1,
-		int pageSize = 20,
 		CancellationToken cancellationToken = default)
 	{
 		if (currentUser.UserId is not Guid userId)
@@ -26,6 +24,6 @@ public static class LedgerEndpoints
 			return Results.Unauthorized();
 		}
 
-		return Results.Ok(await service.GetAsync(userId, page, pageSize, cancellationToken));
+		return Results.Ok(await service.GetAsync(userId, cancellationToken));
 	}
 }

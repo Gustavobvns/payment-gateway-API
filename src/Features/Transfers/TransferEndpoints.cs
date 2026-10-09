@@ -1,4 +1,5 @@
 using payment_gateway_API.src.Auth.CurrentUser;
+using Microsoft.AspNetCore.Mvc;
 
 namespace payment_gateway_API.src.Features.Transfers;
 
@@ -22,6 +23,7 @@ public static class TransferEndpoints
 	private static async Task<IResult> TransferAsync(
 		Guid destinationAccountId,
 		TransferRequest request,
+		[FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
 		ICurrentUser currentUser,
 		ITransferService transferService,
 		CancellationToken cancellationToken)
@@ -35,6 +37,7 @@ public static class TransferEndpoints
 			userId,
 			destinationAccountId,
 			request,
+			idempotencyKey ?? string.Empty,
 			cancellationToken);
 
 		return Results.Created("/ledger", transfer);

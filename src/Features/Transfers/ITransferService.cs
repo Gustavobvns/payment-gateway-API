@@ -6,5 +6,6 @@ public interface ITransferService
 		Guid userId,
 		Guid destinationAccountId,
 		TransferRequest request,
+		string idempotencyKey,
 		CancellationToken cancellationToken);
 }

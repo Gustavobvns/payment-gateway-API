@@ -63,7 +63,7 @@ Este projeto representa o *core* de movimentações financeiras de uma carteira 
   - conta de destino existente
   - saldo suficiente na conta de origem
 - Operação transacional (ACID)
-- Registro de Leadger
+- Registro no Ledger
 
 ### 3) Payments (Cobranças)
 - Geração de código de cobrança com:
@@ -78,7 +78,7 @@ Este projeto representa o *core* de movimentações financeiras de uma carteira 
 - Pagamento de cobrança usando o valor atualizado da consulta
 
 ### 4) Ledger (Extrato)
-- Consulta paginada do histórico imutável de transações da conta autenticada
+- Consulta do histórico completo e imutável de transações da conta autenticada
 
 ---
 
@@ -164,6 +164,12 @@ docker compose up -d --build
 ### 3) Acessar Swagger
 - **http://localhost:8080/swagger**
 
+O Swagger possui autenticação Bearer configurada. Use o botão **Authorize** e informe:
+
+```http
+Bearer SEU_TOKEN_JWT
+```
+
 ---
 
 ## 🔐 Autenticação
@@ -190,7 +196,18 @@ Authorization: Bearer SEU_TOKEN_JWT
 | Payments  | POST   | `/payments`                | Geração de cobrança |
 | Payments  | GET    | `/payments/{codigo}`       | Consulta de cobrança |
 | Payments  | POST   | `/payments/{codigo}/pay`   | Pagamento de cobrança |
-| Ledger    | GET    | `/ledger`                  | Extrato da conta autenticada |
+| Ledger    | GET    | `/ledger`                  | Extrato completo da conta autenticada |
+| Health    | GET    | `/health`                  | Verificação de disponibilidade do PostgreSQL |
+
+As operações `POST /transfers/{destinationAccountId}`, `POST /payments` e
+`POST /payments/{codigo}/pay` exigem o header:
+
+```http
+Idempotency-Key: uma-chave-unica-da-operacao
+```
+
+Uma repetição da mesma chave para o mesmo usuário e operação reutiliza o
+resultado persistido, evitando duplicidade em retries.
 
 ---
 
@@ -234,7 +251,7 @@ A suíte de testes foi projetada com foco na integridade de dados e na validaç�
 | :--- | :--- | :--- |
 | **Unitário** | `PaymentService` | Cálculo exato de juros diários por atraso, pagamento sem acréscimo dentro do prazo e rejeição de cobranças já pagas. |
 | **Unitário** | `TransferService` | Débito/crédito simultâneo em transferência P2P, falha por saldo insuficiente e registro no ledger. |
-| **Unitário** | `LedgerService` | Consulta autenticada, paginação e distinção entre entrada e saída. |
+| **Unitário** | `LedgerService` | Consulta autenticada, retorno completo e distinção entre entrada e saída. |
 | **Unitário** | `AuthService` | Verificação de hash de senha (`BCrypt`), geração do JWT Token com *claims* e expiração. |
 
 ---
@@ -251,15 +268,22 @@ dotnet test
 dotnet test --logger "console;verbosity=detailed"
 ```
 
+Os testes HTTP com PostgreSQL usam Testcontainers. Para executá-los, inicie o
+Docker e defina `RUN_POSTGRES_INTEGRATION_TESTS=true` antes de executar:
+
+```powershell
+$env:RUN_POSTGRES_INTEGRATION_TESTS = "true"
+dotnet test --filter "FullyQualifiedName~ApiIntegrationTests"
+```
+
 ---
 
-## ⚠️ Limitações atuais (projeto em evolução)
+### Regras de entrada
 
-- Idempotência explícita e testes de concorrência das operações financeiras ainda são próximos passos
-- O cálculo de juros atual utiliza acréscimo fixo por dia de atraso (`JurosDiario`)
-- Testes HTTP de integração com PostgreSQL ainda serão adicionados
-- Endpoints e contratos podem sofrer ajustes durante evolução do domínio
-- Foco atual em arquitetura, robustez de regras financeiras e qualidade de código
+- Nome, documento e email respeitam os limites definidos no modelo de dados
+- Email é validado antes do cadastro ou atualização
+- Senhas possuem entre 8 e 100 caracteres
+- Valores financeiros e juros aceitam no máximo duas casas decimais
 
 ---
 

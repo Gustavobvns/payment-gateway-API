@@ -1,4 +1,5 @@
 using payment_gateway_API.src.Auth.CurrentUser;
+using Microsoft.AspNetCore.Mvc;
 
 namespace payment_gateway_API.src.Features.Payments;
 
@@ -26,6 +27,7 @@ public static class PaymentEndpoints
 
 	private static async Task<IResult> CreateAsync(
 		CreatePaymentRequest request,
+		[FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
 		ICurrentUser currentUser,
 		IPaymentService service,
 		CancellationToken cancellationToken)
@@ -35,7 +37,8 @@ public static class PaymentEndpoints
 			return Results.Unauthorized();
 		}
 
-		var payment = await service.CreateAsync(userId, request, cancellationToken);
+		var payment = await service.CreateAsync(
+			userId, request, idempotencyKey ?? string.Empty, cancellationToken);
 		return Results.Created($"/payments/{payment.Codigo}", payment);
 	}
 
@@ -47,6 +50,7 @@ public static class PaymentEndpoints
 
 	private static async Task<IResult> PayAsync(
 		string code,
+		[FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
 		ICurrentUser currentUser,
 		IPaymentService service,
 		CancellationToken cancellationToken)
@@ -56,6 +60,7 @@ public static class PaymentEndpoints
 			return Results.Unauthorized();
 		}
 
-		return Results.Ok(await service.PayAsync(userId, code, cancellationToken));
+		return Results.Ok(await service.PayAsync(
+			userId, code, idempotencyKey ?? string.Empty, cancellationToken));
 	}
 }
