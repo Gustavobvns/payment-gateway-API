@@ -4,17 +4,8 @@ API REST de carteira digital desenvolvida em .NET para demonstrar autenticação
 
 ---
 
-# 📍 Status do Projeto e Estratégia de Desenvolvimento
-
-> **Status Atual:** 🛠️ Em Desenvolvimento (Fase de Implementação)
-
-A evolução do projeto segue a arquitetura **Vertical Slice**, onde cada funcionalidade é construída de forma isolada, contendo seus próprios contratos (DTOs), regras de negócio (Services), rotas (Endpoints) e testes.
-
----
-
 ## 📌 Visão Geral
-
-Este projeto representa o *core* de movimentações financeiras de uma carteira digital, incluindo:
+Este projeto é uma API educacional que simula o core de uma carteira digital. Não integra provedores de pagamento nem processa transações reais de cartão ou Pix.
 
 - Cadastro e autenticação de usuários
 - Conta digital vinculada ao usuário
@@ -122,25 +113,36 @@ Transacoes:
 
 ```text
 payment-gateway-API/
-└── src/
-    ├── Data/
-    ├── Models/
-    │
-    ├── Features/
-    │   ├── Auth/
-    |   |   ├── Services/
-    |   |   ├── Register/
-    |   |   ├── Login/
-    │   ├── Transfers/
-    |   ├── Users/
-    │   ├── Payments/
-    │   └── Ledger/
-    │
-    │── Migrations/
-    ├── Program.cs
-    ├── appsettings.json
-    ├── Dockerfile
-    └── docker-compose.yml
+├── src/
+│   ├── Auth/
+│   │   ├── Configuration/
+│   │   ├── Contracts/
+│   │   ├── CurrentUser/
+│   │   ├── Infrastructure/
+│   │   ├── Login/
+│   │   ├── Register/
+│   │   ├── Services/
+│   │   └── Users/
+│   ├── Data/
+│   │   ├── Configurations/
+│   │   └── Migrations/
+│   ├── Features/
+│   │   ├── Financial/
+│   │   ├── Ledger/
+│   │   ├── Payments/
+│   │   └── Transfers/
+│   ├── Infrastructure/
+│   └── Models/
+├── tests/
+│   ├── Auth/
+│   ├── ApiIntegrationTests.cs
+│   └── FinancialServicesTests.cs
+├── Dockerfile
+├── docker-compose.yml
+├── payment-gateway-API.csproj
+├── payment-gateway-API.slnx
+├── payment-gateway-API.http
+└── financial-api.http
 ```
 
 ---
@@ -164,6 +166,11 @@ docker compose up -d --build
 ### 3) Acessar Swagger
 - **http://localhost:8080/swagger**
 
+O `docker-compose.yml` publica a API na porta `8080`. Ao executar a aplicação
+diretamente com o perfil de desenvolvimento (`dotnet run`), a porta HTTP
+configurada em `Properties/launchSettings.json` é `5201`; essa é a porta usada
+pelos arquivos `payment-gateway-API.http` e `financial-api.http`.
+
 O Swagger possui autenticação Bearer configurada. Use o botão **Authorize** e informe:
 
 ```http
@@ -173,6 +180,13 @@ Bearer SEU_TOKEN_JWT
 ---
 
 ## 🔐 Autenticação
+
+Os tokens JWT são stateless e permanecem válidos até sua data de expiração.
+A desativação lógica de um usuário não invalida imediatamente tokens emitidos
+anteriormente, pois a API não mantém uma lista de revogação nem consulta o
+status do usuário a cada requisição autenticada. Um novo login deve ser
+impedido para usuários desativados, e o token deixa de ser aceito
+automaticamente quando expirar.
 
 Após login, utilize o token JWT no cabeçalho:
 
@@ -208,6 +222,141 @@ Idempotency-Key: uma-chave-unica-da-operacao
 
 Uma repetição da mesma chave para o mesmo usuário e operação reutiliza o
 resultado persistido, evitando duplicidade em retries.
+
+### Exemplos de requisições e respostas
+
+Os exemplos abaixo usam `http://localhost:8080`, quando a API foi iniciada
+com Docker Compose. Para execução local sem Docker, substitua a base por
+`http://localhost:5201`, como nos arquivos `.http` do repositório.
+
+#### 1. Cadastro
+
+```http
+POST /auth/register
+Content-Type: application/json
+
+{
+  "nome": "Gustavo",
+  "documento": "12345678900",
+  "email": "gustavo@example.com",
+  "senha": "Senha-Forte-123"
+}
+```
+
+Resposta `201 Created`:
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "expiresAt": "2026-10-19T17:02:57Z"
+}
+```
+
+#### 2. Login e obtenção do token
+
+```http
+POST /auth/login
+Content-Type: application/json
+
+{
+  "email": "gustavo@example.com",
+  "senha": "Senha-Forte-123"
+}
+```
+
+Resposta `200 OK`:
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "expiresAt": "2026-10-19T17:02:57Z"
+}
+```
+
+Use o valor de `accessToken` nas requisições protegidas:
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+```
+
+#### 3. Transferência entre duas contas
+
+Considere que `destinationAccountId` é o GUID da conta de outro usuário e que
+a conta de origem possui saldo suficiente.
+
+```http
+POST /transfers/{destinationAccountId}
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Idempotency-Key: transferencia-exemplo-001
+Content-Type: application/json
+
+{
+  "valor": 25.00
+}
+```
+
+Resposta `201 Created`:
+
+```json
+{
+  "id": "0199f000-0000-7000-8000-000000000001",
+  "contaOrigemId": "0199f000-0000-7000-8000-000000000002",
+  "contaDestinoId": "0199f000-0000-7000-8000-000000000003",
+  "valor": 25.00,
+  "dataTransacao": "2026-10-19T16:05:00+00:00"
+}
+```
+
+#### 4. Criação e pagamento de uma cobrança
+
+Primeiro, o usuário recebedor cria a cobrança:
+
+```http
+POST /payments
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Idempotency-Key: cobranca-exemplo-001
+Content-Type: application/json
+
+{
+  "contaRecebedoraId": "0199f000-0000-7000-8000-000000000003",
+  "valorOriginal": 50.00,
+  "dataVencimento": "2026-12-31",
+  "jurosDiario": 1.50
+}
+```
+
+Resposta `201 Created`:
+
+```json
+{
+  "codigo": "a1b2c3d4e5f6...",
+  "contaRecebedoraId": "0199f000-0000-7000-8000-000000000003",
+  "valorOriginal": 50.00,
+  "valorAtualizado": 50.00,
+  "dataVencimento": "2026-12-31",
+  "jurosDiario": 1.50,
+  "paga": false
+}
+```
+
+Depois, o pagador usa o código retornado:
+
+```http
+POST /payments/{codigo}/pay
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Idempotency-Key: pagamento-exemplo-001
+```
+
+Resposta `200 OK`:
+
+```json
+{
+  "codigo": "a1b2c3d4e5f6...",
+  "valorPago": 50.00,
+  "transacaoId": "0199f000-0000-7000-8000-000000000004",
+  "dataPagamento": "2026-10-19T16:06:00+00:00"
+}
+```
 
 ---
 
@@ -249,10 +398,18 @@ A suíte de testes foi projetada com foco na integridade de dados e na validaç�
 
 | Nível | Componente / Feature | Cenários Validados |
 | :--- | :--- | :--- |
-| **Unitário** | `PaymentService` | Cálculo exato de juros diários por atraso, pagamento sem acréscimo dentro do prazo e rejeição de cobranças já pagas. |
-| **Unitário** | `TransferService` | Débito/crédito simultâneo em transferência P2P, falha por saldo insuficiente e registro no ledger. |
-| **Unitário** | `LedgerService` | Consulta autenticada, retorno completo e distinção entre entrada e saída. |
-| **Unitário** | `AuthService` | Verificação de hash de senha (`BCrypt`), geração do JWT Token com *claims* e expiração. |
+| **Serviço** | `PaymentService` | Pagamento, rejeição de cobrança já paga, repetição idempotente, reutilização inconsistente de chave e congelamento do valor após a liquidação. |
+| **Serviço** | `TransferService` | Débito/crédito atômico, saldo insuficiente sem alteração parcial, repetição idempotente, reutilização inconsistente de chave e registro no ledger. |
+| **Serviço** | `LedgerService` | Consulta do histórico e distinção entre entradas e saídas. |
+| **Autenticação** | `LoginService` e `PasswordHasher` | Login válido, senha inválida sem diferenciar e-mail inexistente, hash de senha e bloqueio de usuário inativo. |
+| **JWT** | `JwtTokenGenerator` | Claims, emissor, audiência, expiração e rejeição de tokens expirados ou com assinatura inválida. |
+
+Os testes de concorrência entre requisições e a confirmação da atomicidade
+entre a operação financeira e o registro de idempotência dependem de
+PostgreSQL real. Atualmente, o teste de integração versionado cobre saúde e
+cadastro usando Testcontainers; os cenários de concorrência devem ser
+executados nesse mesmo ambiente antes de serem tratados como garantia da
+suíte SQLite em memória.
 
 ---
 

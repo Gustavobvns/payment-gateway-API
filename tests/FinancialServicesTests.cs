@@ -36,6 +36,84 @@ public sealed class FinancialServicesTests
 	}
 
 	[Fact]
+	public async Task TransferenciaComSaldoInsuficienteNaoDeveAlterarAsContas()
+	{
+		await using var database = CreateDatabase();
+		var source = CreateUser("source-insufficient@example.com");
+		var destination = CreateUser("destination-insufficient@example.com");
+		database.Usuarios.AddRange(source.User, destination.User);
+		database.Contas.AddRange(source.Account, destination.Account);
+		source.Account.Saldo = 20m;
+		await database.SaveChangesAsync();
+
+		var action = () => new TransferService(database).TransferAsync(
+			source.User.Id,
+			destination.Account.Id,
+			new TransferRequest(35m),
+			"insufficient-key",
+			CancellationToken.None);
+
+		await action.Should().ThrowAsync<InsufficientBalanceException>();
+		source.Account.Saldo.Should().Be(20m);
+		destination.Account.Saldo.Should().Be(0m);
+		(await database.Transacoes.CountAsync()).Should().Be(0);
+	}
+
+	[Fact]
+	public async Task TransferRepetidaComMesmaChaveDeveRetornarResultadoOriginalSemNovoLancamento()
+	{
+		await using var database = CreateDatabase();
+		var source = CreateUser("source-idempotency@example.com");
+		var destination = CreateUser("destination-idempotency@example.com");
+		database.Usuarios.AddRange(source.User, destination.User);
+		database.Contas.AddRange(source.Account, destination.Account);
+		source.Account.Saldo = 100m;
+		await database.SaveChangesAsync();
+
+		var service = new TransferService(database);
+		var request = new TransferRequest(35m);
+		var first = await service.TransferAsync(
+			source.User.Id, destination.Account.Id, request, "transfer-key", CancellationToken.None);
+		var repeated = await service.TransferAsync(
+			source.User.Id, destination.Account.Id, request, "transfer-key", CancellationToken.None);
+
+		repeated.Should().Be(first);
+		source.Account.Saldo.Should().Be(65m);
+		(await database.Transacoes.CountAsync()).Should().Be(1);
+	}
+
+	[Fact]
+	public async Task ChaveDeIdempotenciaNaoPodeSerReutilizadaComOutraTransferencia()
+	{
+		await using var database = CreateDatabase();
+		var source = CreateUser("source-conflict@example.com");
+		var destination = CreateUser("destination-conflict@example.com");
+		database.Usuarios.AddRange(source.User, destination.User);
+		database.Contas.AddRange(source.Account, destination.Account);
+		source.Account.Saldo = 100m;
+		await database.SaveChangesAsync();
+
+		var service = new TransferService(database);
+		await service.TransferAsync(
+			source.User.Id,
+			destination.Account.Id,
+			new TransferRequest(35m),
+			"transfer-key",
+			CancellationToken.None);
+
+		var action = () => service.TransferAsync(
+			source.User.Id,
+			destination.Account.Id,
+			new TransferRequest(40m),
+			"transfer-key",
+			CancellationToken.None);
+
+		await action.Should().ThrowAsync<FinancialValidationException>();
+		source.Account.Saldo.Should().Be(65m);
+		(await database.Transacoes.CountAsync()).Should().Be(1);
+	}
+
+	[Fact]
 	public async Task PaymentDeveAplicarJurosEImpedirPagamentoDuplicado()
 	{
 		await using var database = CreateDatabase();
@@ -63,6 +141,72 @@ public sealed class FinancialServicesTests
 		receiver.Account.Saldo.Should().Be(20m);
 		var action = () => service.PayAsync(payer.User.Id, created.Codigo, CancellationToken.None);
 		await action.Should().ThrowAsync<PaymentAlreadyPaidException>();
+	}
+
+	[Fact]
+	public async Task PagamentoRepetidoComMesmaChaveDeveRetornarResultadoOriginal()
+	{
+		await using var database = CreateDatabase();
+		var receiver = CreateUser("receiver-retry@example.com");
+		var payer = CreateUser("payer-retry@example.com");
+		database.Usuarios.AddRange(receiver.User, payer.User);
+		database.Contas.AddRange(receiver.Account, payer.Account);
+		payer.Account.Saldo = 100m;
+		await database.SaveChangesAsync();
+		var service = new PaymentService(database);
+		var payment = await service.CreateAsync(
+			receiver.User.Id,
+			new CreatePaymentRequest(
+				receiver.Account.Id,
+				20m,
+				DateOnly.FromDateTime(DateTime.UtcNow),
+				0m),
+			"create-key",
+			CancellationToken.None);
+
+		var first = await service.PayAsync(payer.User.Id, payment.Codigo, "pay-key", CancellationToken.None);
+		var repeated = await service.PayAsync(payer.User.Id, payment.Codigo, "pay-key", CancellationToken.None);
+
+		repeated.Should().Be(first);
+		payer.Account.Saldo.Should().Be(80m);
+		(await database.Transacoes.CountAsync()).Should().Be(1);
+	}
+
+	[Fact]
+	public async Task ConsultaDeCobrancaPagaDeveManterOValorLiquidado()
+	{
+		await using var database = CreateDatabase();
+		var receiver = CreateUser("receiver-settled@example.com");
+		var payer = CreateUser("payer-settled@example.com");
+		database.Usuarios.AddRange(receiver.User, payer.User);
+		database.Contas.AddRange(receiver.Account, payer.Account);
+		payer.Account.Saldo = 100m;
+		await database.SaveChangesAsync();
+		var service = new PaymentService(database);
+		var payment = await service.CreateAsync(
+			receiver.User.Id,
+			new CreatePaymentRequest(
+				receiver.Account.Id,
+				20m,
+				DateOnly.FromDateTime(DateTime.UtcNow),
+				1m),
+			"create-settled-key",
+			CancellationToken.None);
+
+		var paymentEntity = await database.CodigosPagamento.SingleAsync();
+		paymentEntity.DataVencimento = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+		await database.SaveChangesAsync();
+
+		var paid = await service.PayAsync(
+			payer.User.Id, payment.Codigo, "pay-settled-key", CancellationToken.None);
+
+		paymentEntity.DataVencimento = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30);
+		await database.SaveChangesAsync();
+
+		var queried = await service.GetAsync(payment.Codigo, CancellationToken.None);
+
+		paid.ValorPago.Should().Be(21m);
+		queried.ValorAtualizado.Should().Be(21m);
 	}
 
 	[Fact]

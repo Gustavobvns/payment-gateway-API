@@ -115,6 +115,11 @@ namespace payment_gateway_API.src.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("ResponseJson")
                         .IsRequired()
                         .HasColumnType("text");

@@ -28,11 +28,13 @@ public sealed class TransferService(AppDbContext dbContext, IdempotencyService i
 		CancellationToken cancellationToken)
 	{
 		ValidateIdempotencyKey(idempotencyKey);
-		var previous = await idempotencyService.GetAsync<TransferResponse>(
-			userId, "transfer", idempotencyKey, cancellationToken);
-		if (previous is not null)
+		var requestHash = IdempotencyService.ComputeRequestHash(
+			new { destinationAccountId, request });
+		var previousResult = await idempotencyService.GetAsync<TransferResponse>(
+			userId, "transfer", idempotencyKey, requestHash, cancellationToken);
+		if (previousResult is not null)
 		{
-			return previous;
+			return previousResult;
 		}
 
 		InputValidation.ValidateMoney(request.Valor, "O valor da transferência");
@@ -77,6 +79,14 @@ public sealed class TransferService(AppDbContext dbContext, IdempotencyService i
 		};
 
 		dbContext.Transacoes.Add(transfer);
+		idempotencyService.Add(
+			userId, "transfer", idempotencyKey, requestHash,
+			new TransferResponse(
+				transfer.Id,
+				transfer.ContaOrigemId,
+				transfer.ContaDestinoId,
+				transfer.Valor,
+				new DateTimeOffset(transfer.DataTransacao, TimeSpan.Zero)));
 		try
 		{
 			await dbContext.SaveChangesAsync(cancellationToken);
@@ -84,17 +94,31 @@ public sealed class TransferService(AppDbContext dbContext, IdempotencyService i
 		}
 		catch (DbUpdateConcurrencyException)
 		{
+			await transaction.RollbackAsync(cancellationToken);
 			throw new FinancialConcurrencyException();
 		}
+		catch (DbUpdateException exception)
+		{
+			await transaction.RollbackAsync(cancellationToken);
+			dbContext.ChangeTracker.Clear();
+			var previous = await idempotencyService.GetAsync<TransferResponse>(
+				userId, "transfer", idempotencyKey, requestHash, cancellationToken);
+			if (previous is not null)
+			{
+				return previous;
+			}
 
-		var response = new TransferResponse(
+			throw new InvalidOperationException(
+				"A chave de idempotência entrou em conflito, mas o resultado original não foi encontrado.",
+				exception);
+		}
+
+		return new TransferResponse(
 			transfer.Id,
 			transfer.ContaOrigemId,
 			transfer.ContaDestinoId,
 			transfer.Valor,
 			new DateTimeOffset(transfer.DataTransacao, TimeSpan.Zero));
-		return await idempotencyService.SaveOrGetAsync(
-			userId, "transfer", idempotencyKey, response, cancellationToken);
 	}
 
 	private static void ValidateIdempotencyKey(string key)

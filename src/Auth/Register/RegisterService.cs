@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using payment_gateway_API.src.Auth.Contracts.Login;
 using payment_gateway_API.src.Auth.Contracts.Register;
 using payment_gateway_API.src.Auth.Infrastructure;
@@ -56,7 +57,7 @@ public sealed class RegisterService(
 			await dbContext.SaveChangesAsync(cancellationToken);
 			await transaction.CommitAsync(cancellationToken);
 		}
-		catch (DbUpdateException)
+		catch (DbUpdateException exception) when (IsUniqueViolation(exception))
 		{
 			await transaction.RollbackAsync(cancellationToken);
 			throw new DuplicateUserException("email ou documento");
@@ -68,6 +69,19 @@ public sealed class RegisterService(
 		}
 
 		return responseFactory.Create(usuario);
+	}
+
+	private static bool IsUniqueViolation(DbUpdateException exception)
+	{
+		for (var current = exception.InnerException; current is not null; current = current.InnerException)
+		{
+			if (current is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private static void ValidateRegistration(RegisterRequest request)

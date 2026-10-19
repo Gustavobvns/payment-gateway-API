@@ -34,11 +34,12 @@ public sealed class PaymentService(AppDbContext dbContext, IdempotencyService id
 		CancellationToken cancellationToken)
 	{
 		ValidateIdempotencyKey(idempotencyKey);
-		var previous = await idempotencyService.GetAsync<PaymentResponse>(
-			userId, "payment-create", idempotencyKey, cancellationToken);
-		if (previous is not null)
+		var requestHash = IdempotencyService.ComputeRequestHash(request);
+		var previousResult = await idempotencyService.GetAsync<PaymentResponse>(
+			userId, "payment-create", idempotencyKey, requestHash, cancellationToken);
+		if (previousResult is not null)
 		{
-			return previous;
+			return previousResult;
 		}
 
 		InputValidation.ValidateMoney(request.ValorOriginal, "O valor");
@@ -73,11 +74,30 @@ public sealed class PaymentService(AppDbContext dbContext, IdempotencyService id
 		};
 
 		dbContext.CodigosPagamento.Add(payment);
-		await dbContext.SaveChangesAsync(cancellationToken);
-
 		var response = ToResponse(payment, code);
-		return await idempotencyService.SaveOrGetAsync(
-			userId, "payment-create", idempotencyKey, response, cancellationToken);
+		idempotencyService.Add(userId, "payment-create", idempotencyKey, requestHash, response);
+		await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+		try
+		{
+			await dbContext.SaveChangesAsync(cancellationToken);
+			await transaction.CommitAsync(cancellationToken);
+			return response;
+		}
+		catch (DbUpdateException exception)
+		{
+			await transaction.RollbackAsync(cancellationToken);
+			dbContext.ChangeTracker.Clear();
+			var previous = await idempotencyService.GetAsync<PaymentResponse>(
+				userId, "payment-create", idempotencyKey, requestHash, cancellationToken);
+			if (previous is not null)
+			{
+				return previous;
+			}
+
+			throw new InvalidOperationException(
+				"A chave de idempotência entrou em conflito, mas o resultado original não foi encontrado.",
+				exception);
+		}
 	}
 
 	public async Task<PaymentResponse> GetAsync(
@@ -94,7 +114,17 @@ public sealed class PaymentService(AppDbContext dbContext, IdempotencyService id
 			.SingleOrDefaultAsync(item => item.CodigoPagamentoHash == Hash(code), cancellationToken)
 			?? throw new FinancialNotFoundException("A cobrança não foi encontrada.");
 
-		return ToResponse(payment, code);
+		decimal? settledAmount = payment.Status
+			? await dbContext.Transacoes
+				.AsNoTracking()
+				.Where(item => item.CodigoPagamentoId == payment.Id)
+				.Select(item => (decimal?)item.Valor)
+				.SingleOrDefaultAsync(cancellationToken)
+				?? throw new InvalidOperationException(
+					"A cobrança está marcada como paga, mas o lançamento de liquidação não foi encontrado.")
+			: null;
+
+		return ToResponse(payment, code, settledAmount);
 	}
 
 	public async Task<PaymentResult> PayAsync(
@@ -104,11 +134,12 @@ public sealed class PaymentService(AppDbContext dbContext, IdempotencyService id
 		CancellationToken cancellationToken)
 	{
 		ValidateIdempotencyKey(idempotencyKey);
-		var previous = await idempotencyService.GetAsync<PaymentResult>(
-			userId, "payment-pay", idempotencyKey, cancellationToken);
-		if (previous is not null)
+		var requestHash = IdempotencyService.ComputeRequestHash(new { code });
+		var previousResult = await idempotencyService.GetAsync<PaymentResult>(
+			userId, "payment-pay", idempotencyKey, requestHash, cancellationToken);
+		if (previousResult is not null)
 		{
-			return previous;
+			return previousResult;
 		}
 
 		if (string.IsNullOrWhiteSpace(code))
@@ -166,6 +197,12 @@ public sealed class PaymentService(AppDbContext dbContext, IdempotencyService id
 			DataTransacao = DateTime.UtcNow
 		};
 		dbContext.Transacoes.Add(ledgerEntry);
+		var result = new PaymentResult(
+			code,
+			amount,
+			ledgerEntry.Id,
+			new DateTimeOffset(ledgerEntry.DataTransacao, TimeSpan.Zero));
+		idempotencyService.Add(userId, "payment-pay", idempotencyKey, requestHash, result);
 		try
 		{
 			await dbContext.SaveChangesAsync(cancellationToken);
@@ -173,16 +210,26 @@ public sealed class PaymentService(AppDbContext dbContext, IdempotencyService id
 		}
 		catch (DbUpdateConcurrencyException)
 		{
+			await transaction.RollbackAsync(cancellationToken);
 			throw new FinancialConcurrencyException();
 		}
+		catch (DbUpdateException exception)
+		{
+			await transaction.RollbackAsync(cancellationToken);
+			dbContext.ChangeTracker.Clear();
+			var previous = await idempotencyService.GetAsync<PaymentResult>(
+				userId, "payment-pay", idempotencyKey, requestHash, cancellationToken);
+			if (previous is not null)
+			{
+				return previous;
+			}
 
-		var result = new PaymentResult(
-			code,
-			amount,
-			ledgerEntry.Id,
-			new DateTimeOffset(ledgerEntry.DataTransacao, TimeSpan.Zero));
-		return await idempotencyService.SaveOrGetAsync(
-			userId, "payment-pay", idempotencyKey, result, cancellationToken);
+			throw new InvalidOperationException(
+				"A chave de idempotência entrou em conflito, mas o resultado original não foi encontrado.",
+				exception);
+		}
+
+		return result;
 	}
 
 	private static void ValidateIdempotencyKey(string key)
@@ -193,12 +240,15 @@ public sealed class PaymentService(AppDbContext dbContext, IdempotencyService id
 		}
 	}
 
-	private static PaymentResponse ToResponse(CodigosPagamento payment, string code) =>
+	private static PaymentResponse ToResponse(
+		CodigosPagamento payment,
+		string code,
+		decimal? settledAmount = null) =>
 		new(
 			code,
 			payment.ContaGeradoraId,
 			payment.ValorOriginal,
-			CalculateCurrentAmount(payment),
+			settledAmount ?? CalculateCurrentAmount(payment),
 			payment.DataVencimento,
 			payment.JurosDiario,
 			payment.Status);

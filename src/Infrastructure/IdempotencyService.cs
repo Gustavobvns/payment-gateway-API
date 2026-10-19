@@ -1,6 +1,9 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using payment_gateway_API.src.Data;
+using payment_gateway_API.src.Features.Financial;
 using payment_gateway_API.src.Models;
 
 namespace payment_gateway_API.src.Infrastructure;
@@ -11,6 +14,7 @@ public sealed class IdempotencyService(AppDbContext dbContext)
         Guid userId,
         string operation,
         string key,
+        string requestHash,
         CancellationToken cancellationToken)
     {
         var record = await dbContext.IdempotencyRecords
@@ -21,43 +25,41 @@ public sealed class IdempotencyService(AppDbContext dbContext)
                         item.Key == key,
                 cancellationToken);
 
-        return record is null
-            ? default
-            : JsonSerializer.Deserialize<T>(record.ResponseJson);
+        if (record is null)
+        {
+            return default;
+        }
+
+        if (!string.Equals(record.RequestHash, requestHash, StringComparison.Ordinal))
+        {
+            throw new FinancialValidationException(
+                "A chave de idempotência já foi utilizada com parâmetros diferentes.");
+        }
+
+        return JsonSerializer.Deserialize<T>(record.ResponseJson)
+            ?? throw new InvalidOperationException("O resultado de idempotência persistido é inválido.");
     }
 
-    public async Task<T> SaveOrGetAsync<T>(
+    public void Add<T>(
         Guid userId,
         string operation,
         string key,
+        string requestHash,
         T response,
-        CancellationToken cancellationToken)
+        int statusCode = StatusCodes.Status200OK)
     {
         dbContext.IdempotencyRecords.Add(new IdempotencyRecord
         {
             UserId = userId,
             Operation = operation,
             Key = key,
+            RequestHash = requestHash,
             ResponseJson = JsonSerializer.Serialize(response),
-            StatusCode = StatusCodes.Status200OK
+            StatusCode = statusCode
         });
-
-        try
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return response;
-        }
-        catch (DbUpdateException)
-        {
-            foreach (var entry in dbContext.ChangeTracker.Entries<IdempotencyRecord>()
-                         .Where(entry => entry.State == EntityState.Added))
-            {
-                entry.State = EntityState.Detached;
-            }
-
-            var previous = await GetAsync<T>(userId, operation, key, cancellationToken);
-            return previous ?? throw new InvalidOperationException(
-                "A chave de idempotência entrou em conflito, mas o resultado original não foi encontrado.");
-        }
     }
+
+    public static string ComputeRequestHash<T>(T request) =>
+        Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request)))).ToLowerInvariant();
 }

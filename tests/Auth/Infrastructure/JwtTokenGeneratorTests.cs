@@ -1,6 +1,9 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using payment_gateway_API.src.Auth.Configuration;
 using payment_gateway_API.src.Auth.Infrastructure;
 using payment_gateway_API.src.Models;
@@ -45,6 +48,47 @@ public class JwtTokenGeneratorTests
 	}
 
 	[Fact]
+	public void DeveRejeitarTokenComAssinaturaInvalida()
+	{
+		var generator = new JwtTokenGenerator(Options.Create(ValidOptions));
+		var token = new JwtSecurityTokenHandler().ReadJwtToken(
+			generator.GenerateToken(CreateUser()));
+		var invalidToken = new JwtSecurityToken(
+			token.Issuer,
+			token.Audiences.Single(),
+			token.Claims,
+			token.ValidFrom,
+			token.ValidTo,
+			new SigningCredentials(
+				new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+					"another-development-key-that-is-long-enough-123456")),
+				SecurityAlgorithms.HmacSha256));
+
+		var action = () => ValidateToken(new JwtSecurityTokenHandler().WriteToken(invalidToken));
+
+		action.Should().Throw<SecurityTokenInvalidSignatureException>();
+	}
+
+	[Fact]
+	public void DeveRejeitarTokenExpirado()
+	{
+		var handler = new JwtSecurityTokenHandler();
+		var expiredToken = new JwtSecurityToken(
+			ValidOptions.Issuer,
+			ValidOptions.Audience,
+			[ new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()) ],
+			DateTime.UtcNow.AddMinutes(-2),
+			DateTime.UtcNow.AddMinutes(-1),
+			new SigningCredentials(
+				new SymmetricSecurityKey(Encoding.UTF8.GetBytes(ValidOptions.Key)),
+				SecurityAlgorithms.HmacSha256));
+
+		var action = () => ValidateToken(handler.WriteToken(expiredToken));
+
+		action.Should().Throw<SecurityTokenExpiredException>();
+	}
+
+	[Fact]
 	public void DeveRejeitarConfiguracaoJWTInvalida()
 	{
 		var invalidOptions = new JwtOptions
@@ -69,4 +113,23 @@ public class JwtTokenGeneratorTests
 		SenhaHash = "hash",
 		Ativo = true
 	};
+
+	private static void ValidateToken(string token)
+	{
+		new JwtSecurityTokenHandler().ValidateToken(
+			token,
+			new TokenValidationParameters
+			{
+				ValidateIssuerSigningKey = true,
+				IssuerSigningKey = new SymmetricSecurityKey(
+					Encoding.UTF8.GetBytes(ValidOptions.Key)),
+				ValidateIssuer = true,
+				ValidIssuer = ValidOptions.Issuer,
+				ValidateAudience = true,
+				ValidAudience = ValidOptions.Audience,
+				ValidateLifetime = true,
+				ClockSkew = TimeSpan.Zero
+			},
+			out _);
+	}
 }
