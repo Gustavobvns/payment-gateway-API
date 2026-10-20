@@ -124,9 +124,6 @@ namespace payment_gateway_API.src.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("StatusCode")
-                        .HasColumnType("integer");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 

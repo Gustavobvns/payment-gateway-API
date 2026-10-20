@@ -95,6 +95,14 @@ public sealed class TransferService(AppDbContext dbContext, IdempotencyService i
 		catch (DbUpdateConcurrencyException)
 		{
 			await transaction.RollbackAsync(cancellationToken);
+			dbContext.ChangeTracker.Clear();
+			var previous = await idempotencyService.GetAsync<TransferResponse>(
+				userId, "transfer", idempotencyKey, requestHash, cancellationToken);
+			if (previous is not null)
+			{
+				return previous;
+			}
+
 			throw new FinancialConcurrencyException();
 		}
 		catch (DbUpdateException exception)

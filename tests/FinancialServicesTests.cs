@@ -173,6 +173,67 @@ public sealed class FinancialServicesTests
 	}
 
 	[Fact]
+	public async Task ChaveDeIdempotenciaNaoPodeSerReutilizadaComOutraCobranca()
+	{
+		await using var database = CreateDatabase();
+		var receiver = CreateUser("receiver-create-conflict@example.com");
+		database.Usuarios.Add(receiver.User);
+		database.Contas.Add(receiver.Account);
+		await database.SaveChangesAsync();
+		var service = new PaymentService(database);
+		var dueDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+		await service.CreateAsync(
+			receiver.User.Id,
+			new CreatePaymentRequest(receiver.Account.Id, 20m, dueDate, 0m),
+			"create-conflict-key",
+			CancellationToken.None);
+
+		var action = () => service.CreateAsync(
+			receiver.User.Id,
+			new CreatePaymentRequest(receiver.Account.Id, 25m, dueDate, 0m),
+			"create-conflict-key",
+			CancellationToken.None);
+
+		await action.Should().ThrowAsync<FinancialValidationException>();
+		(await database.CodigosPagamento.CountAsync()).Should().Be(1);
+	}
+
+	[Fact]
+	public async Task ChaveDePagamentoNaoPodeSerReutilizadaParaOutraCobranca()
+	{
+		await using var database = CreateDatabase();
+		var receiver = CreateUser("receiver-pay-conflict@example.com");
+		var payer = CreateUser("payer-pay-conflict@example.com");
+		database.Usuarios.AddRange(receiver.User, payer.User);
+		database.Contas.AddRange(receiver.Account, payer.Account);
+		payer.Account.Saldo = 100m;
+		await database.SaveChangesAsync();
+		var service = new PaymentService(database);
+		var dueDate = DateOnly.FromDateTime(DateTime.UtcNow);
+		var firstPayment = await service.CreateAsync(
+			receiver.User.Id,
+			new CreatePaymentRequest(receiver.Account.Id, 20m, dueDate, 0m),
+			"create-first-pay-conflict",
+			CancellationToken.None);
+		var secondPayment = await service.CreateAsync(
+			receiver.User.Id,
+			new CreatePaymentRequest(receiver.Account.Id, 25m, dueDate, 0m),
+			"create-second-pay-conflict",
+			CancellationToken.None);
+
+		await service.PayAsync(
+			payer.User.Id, firstPayment.Codigo, "pay-conflict-key", CancellationToken.None);
+
+		var action = () => service.PayAsync(
+			payer.User.Id, secondPayment.Codigo, "pay-conflict-key", CancellationToken.None);
+
+		await action.Should().ThrowAsync<FinancialValidationException>();
+		payer.Account.Saldo.Should().Be(80m);
+		(await database.Transacoes.CountAsync()).Should().Be(1);
+	}
+
+	[Fact]
 	public async Task ConsultaDeCobrancaPagaDeveManterOValorLiquidado()
 	{
 		await using var database = CreateDatabase();

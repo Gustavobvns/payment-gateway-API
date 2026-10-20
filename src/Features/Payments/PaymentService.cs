@@ -211,6 +211,14 @@ public sealed class PaymentService(AppDbContext dbContext, IdempotencyService id
 		catch (DbUpdateConcurrencyException)
 		{
 			await transaction.RollbackAsync(cancellationToken);
+			dbContext.ChangeTracker.Clear();
+			var previous = await idempotencyService.GetAsync<PaymentResult>(
+				userId, "payment-pay", idempotencyKey, requestHash, cancellationToken);
+			if (previous is not null)
+			{
+				return previous;
+			}
+
 			throw new FinancialConcurrencyException();
 		}
 		catch (DbUpdateException exception)

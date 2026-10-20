@@ -45,8 +45,7 @@ public sealed class IdempotencyService(AppDbContext dbContext)
         string operation,
         string key,
         string requestHash,
-        T response,
-        int statusCode = StatusCodes.Status200OK)
+        T response)
     {
         dbContext.IdempotencyRecords.Add(new IdempotencyRecord
         {
@@ -54,8 +53,7 @@ public sealed class IdempotencyService(AppDbContext dbContext)
             Operation = operation,
             Key = key,
             RequestHash = requestHash,
-            ResponseJson = JsonSerializer.Serialize(response),
-            StatusCode = statusCode
+            ResponseJson = JsonSerializer.Serialize(response)
         });
     }
 
