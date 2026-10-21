@@ -1,115 +1,43 @@
 # 💳 Payment Gateway API
 
-API REST de carteira digital desenvolvida em .NET para demonstrar autenticação, transferências P2P, cobrança, pagamento com juros por atraso e histórico financeiro, com foco em boas práticas de backend, testes, consistência transacional e execução em Docker.
+API REST de carteira digital simulada, desenvolvida com **.NET 10**, **ASP.NET Core Minimal APIs** e **PostgreSQL**. O projeto foi criado como portfólio para demonstrar fundamentos de backend: autenticação JWT, persistência relacional, operações transacionais, idempotência, testes automatizados e execução reproduzível com Docker.
 
----
+> **esta é uma API educacional que simula operações entre contas. Não integra bancos, adquirentes ou provedores de pagamento e não processa transações reais de cartão ou Pix.**
 
-## 📌 Visão Geral
-Este projeto é uma API educacional que simula o core de uma carteira digital. Não integra provedores de pagamento nem processa transações reais de cartão ou Pix.
+## 📌 Visão geral
 
-- Cadastro e autenticação de usuários
-- Conta digital vinculada ao usuário
-- Transferência P2P entre contas
-- Geração de código de cobrança
-- Consulta de cobrança com atualização dinâmica por juros
-- Pagamento de cobrança
-- Histórico (extrato) de transações
+A API permite criar usuários e contas digitais, transferir valores entre contas, gerar e pagar cobranças e consultar o extrato financeiro. O escopo é intencionalmente reduzido: o foco está na estrutura e nos fundamentos técnicos de uma API, não na implementação de regras de negócio complexas ou integrações financeiras externas.
 
----
+### Práticas técnicas demonstradas
 
-## 🧱 Stack Tecnológica
+- **Autenticação JWT:** emissão de tokens Bearer e validação de assinatura, emissor, audiência e expiração.
+- **Hash de senhas:** armazenamento de senhas com BCrypt, em vez de texto puro.
+- **Persistência relacional:** PostgreSQL com Entity Framework Core, configurações de entidades, relacionamentos, restrições de unicidade e migrações.
+- **Consistência transacional:** operações financeiras agrupam alterações relacionadas de saldo e registros de transação em transações do banco.
+- **Idempotência:** uso do header `Idempotency-Key` nas operações financeiras para recuperar uma resposta previamente armazenada em novas tentativas com a mesma chave, usuário e operação.
+- **Organização por funcionalidades:** estrutura inspirada em Vertical Slice Architecture, mantendo endpoints, serviços e contratos próximos da funcionalidade correspondente.
+- **Tratamento padronizado de erros:** tratamento global de exceções e respostas no formato `ProblemDetails`.
+- **Health check:** endpoint `/health` para verificar a disponibilidade da conexão com o PostgreSQL.
+- **Containerização:** Dockerfile com estágios separados de build e runtime e ambiente local composto por API e PostgreSQL via Docker Compose.
+- **Testes automatizados:** xUnit, Moq, FluentAssertions, SQLite em memória e Testcontainers para testes de integração com PostgreSQL.
 
-- **.NET 10 (C#)**
-- **ASP.NET Core Minimal APIs**
-- **Entity Framework Core**
-- **xUnit**
-- **Mocks**
-- **FluentAssertions**
-- **PostgreSQL**
-- **JWT (JSON Web Token)**
-- **Docker / Docker Compose**
-- Arquitetura **Vertical Slice**
+## 🧱 Stack tecnológica
 
----
+| Área | Tecnologias |
+|---|---|
+| Linguagem e plataforma | C#, .NET 10 |
+| API HTTP | ASP.NET Core Minimal APIs |
+| Autenticação | JWT Bearer, BCrypt |
+| Acesso a dados | Entity Framework Core, Npgsql |
+| Banco de dados | PostgreSQL 16 |
+| Documentação interativa | Swagger / OpenAPI |
+| Testes | xUnit, Moq, FluentAssertions |
+| Testes de integração | ASP.NET Core `WebApplicationFactory`, Testcontainers |
+| Ambiente local | Docker, Docker Compose |
 
-## ✅ Funcionalidades
+## 🧭 Arquitetura e organização
 
-### 1) Auth (Identidade e Segurança)
-- Cadastro de usuário com:
-  - dados pessoais
-  - criação automática de conta digital com saldo inicial zero
-  - armazenamento seguro da senha via hash
-- Login com geração de token JWT
-- Proteção de endpoints financeiros com autenticação
-- CRUD do perfil do usuário autenticado:
-  - consulta dos dados e saldo
-  - atualização de nome, documento e e-mail
-  - alteração de senha
-  - desativação lógica da conta
-
-### 2) Transfers (Transferências Diretas)
-- Transferência P2P entre contas
-- Validações:
-  - valor > 0
-  - conta de destino existente
-  - saldo suficiente na conta de origem
-- Operação transacional (ACID)
-- Registro no Ledger
-
-### 3) Payments (Cobranças)
-- Geração de código de cobrança com:
-  - conta recebedora
-  - valor original
-  - data de vencimento
-  - juros diário
-- Consulta de cobrança:
-  - valida existência
-  - valida status de pagamento
-  - calcula valor atualizado em caso de atraso
-- Pagamento de cobrança usando o valor atualizado da consulta
-
-### 4) Ledger (Extrato)
-- Consulta do histórico completo e imutável de transações da conta autenticada
-
----
-
-## 🗄️ Modelo de Dados
-
-```text
-Usuarios:
-- Id (GUID v7)
-- Nome
-- Documento (Unique)
-- Email (Unique)
-- SenhaHash
-- ativo
-
-Contas:
-- Id (GUID v7)
-- UsuarioId (FK)
-- Saldo (Numeric)
-
-CodigosPagamento:
-- Id (GUID v7)
-- CodigoPagamentoHash (Unique)
-- ContaGeradoraId (FK)
-- ValorOriginal
-- DataVencimento
-- JurosDiario
-- Status
-
-Transacoes:
-- Id (GUID v7)
-- ContaOrigemId (FK)
-- ContaDestinoId (FK)
-- Valor
-- CodigoPagamentoId (FK, Nullable)
-- DataTransacao
-```
-
----
-
-## 🧭 Arquitetura e Organização (Vertical Slice)
+A aplicação utiliza uma organização inspirada em **Vertical Slice Architecture**. `Program.cs` é responsável principalmente pela composição da aplicação — registro das dependências, configuração de autenticação e middleware e mapeamento dos endpoints — enquanto cada funcionalidade concentra seu próprio fluxo.
 
 ```text
 payment-gateway-API/
@@ -145,148 +73,179 @@ payment-gateway-API/
 └── financial-api.http
 ```
 
----
+### Fluxo simplificado de uma requisição
+
+```text
+Cliente HTTP
+    │
+    ▼
+Minimal API endpoint
+    │
+    ▼
+Serviço da funcionalidade
+    │
+    ├── Validações e regras da operação
+    ├── Contexto do usuário autenticado, quando necessário
+    └── Entity Framework Core
+             │
+             ▼
+         PostgreSQL
+```
 
 ## 🚀 Como executar localmente
 
-### Pré-requisitos
-- Docker Desktop instalado e em execução
+A maneira mais simples de executar o projeto é usando Docker Compose. A configuração de desenvolvimento já está no repositório para que qualquer pessoa consiga clonar e executar a API sem depender de chaves privadas ou configurações locais do autor.
 
-### 1) Clonar o repositório
+### Pré-requisitos
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) com Docker Compose disponível.
+
+### 1. Clonar o repositório
+
 ```bash
 git clone https://github.com/Gustavobvns/payment-gateway-API.git
 cd payment-gateway-API
 ```
 
-### 2) Subir infraestrutura
+### 2. Construir e iniciar os serviços
+
 ```bash
 docker compose up -d --build
 ```
 
-### 3) Acessar Swagger
-- **http://localhost:8080/swagger**
+O Compose inicia a API e o PostgreSQL. O banco utiliza um volume nomeado para persistir os dados entre reinicializações. As migrações do Entity Framework Core são aplicadas pela aplicação na inicialização.
 
-O `docker-compose.yml` publica a API na porta `8080`. Ao executar a aplicação
-diretamente com o perfil de desenvolvimento (`dotnet run`), a porta HTTP
-configurada em `Properties/launchSettings.json` é `5201`; essa é a porta usada
-pelos arquivos `payment-gateway-API.http` e `financial-api.http`.
+### 3. Acessar a documentação interativa
 
-O Swagger possui autenticação Bearer configurada. Use o botão **Authorize** e informe:
+- **Swagger UI:** [http://localhost:8080/swagger](http://localhost:8080/swagger)
+- **Health check:** [http://localhost:8080/health](http://localhost:8080/health)
 
-```http
-Bearer SEU_TOKEN_JWT
+Para acompanhar os logs:
+
+```bash
+docker compose logs -f payment-gateway-api
 ```
 
----
+Para parar os serviços:
+
+```bash
+docker compose down
+```
+
+Para apagar também os dados persistidos no volume local do PostgreSQL:
+
+```bash
+docker compose down -v
+```
+
+> **Configuração de desenvolvimento:** o repositório inclui configurações e credenciais demonstrativas para tornar a execução local reproduzível. Elas não devem ser reutilizadas em um ambiente de produção.
+
+### Executar sem Docker (opcional)
+
+Para iniciar a aplicação diretamente, é necessário ter o **.NET SDK 10** e um servidor PostgreSQL acessível. A connection string de desenvolvimento está em `appsettings.Development.json` e aponta para `localhost:5432`.
+
+```bash
+dotnet restore
+dotnet run
+```
+
+No perfil de desenvolvimento, a API utiliza a porta `5201`. Os arquivos `.http` do repositório usam essa porta; no Docker Compose, a porta publicada é `8080`.
 
 ## 🔐 Autenticação
 
-Os tokens JWT são stateless e permanecem válidos até sua data de expiração.
-A desativação lógica de um usuário não invalida imediatamente tokens emitidos
-anteriormente, pois a API não mantém uma lista de revogação nem consulta o
-status do usuário a cada requisição autenticada. Um novo login deve ser
-impedido para usuários desativados, e o token deixa de ser aceito
-automaticamente quando expirar.
-
-Após login, utilize o token JWT no cabeçalho:
+As rotas protegidas utilizam JWT Bearer. Após o login, envie o token no cabeçalho `Authorization`:
 
 ```http
 Authorization: Bearer SEU_TOKEN_JWT
 ```
 
----
+A validação do token considera assinatura, emissor, audiência e expiração. As senhas dos usuários são armazenadas como hashes BCrypt.
+
+O token é stateless e permanece válido até expirar. Na versão atual, a desativação lógica de um usuário não revoga imediatamente tokens já emitidos; um novo login para um usuário desativado deve ser recusado.
 
 ## 📡 Endpoints principais
 
-| Feature   | Método | Rota                       | Descrição |
-|-----------|--------|----------------------------|-----------|
-| Auth      | POST   | `/auth/register`           | Cadastro de usuário e abertura automática de conta |
-| Auth      | POST   | `/auth/login`              | Login e geração de JWT |
-| Users     | GET    | `/users/me`                | Consulta do perfil e saldo da conta autenticada |
-| Users     | PUT    | `/users/me`                | Atualização do perfil do usuário autenticado |
-| Users     | PATCH  | `/users/change-password`   | Alteração de senha do usuário logado |
-| Users     | DELETE | `/users/me`                | Desativação lógica do usuário autenticado |
-| Transfers | POST   | `/transfers/{destinationAccountId}` | Transferência P2P |
-| Payments  | POST   | `/payments`                | Geração de cobrança |
-| Payments  | GET    | `/payments/{codigo}`       | Consulta de cobrança |
-| Payments  | POST   | `/payments/{codigo}/pay`   | Pagamento de cobrança |
-| Ledger    | GET    | `/ledger`                  | Extrato completo da conta autenticada |
-| Health    | GET    | `/health`                  | Verificação de disponibilidade do PostgreSQL |
+Os caminhos abaixo são relativos à raiz da API (`http://localhost:8080` com Docker Compose, ou `http://localhost:5201` com o perfil local de desenvolvimento).
 
-As operações `POST /transfers/{destinationAccountId}`, `POST /payments` e
-`POST /payments/{codigo}/pay` exigem o header:
+| Área | Método | Endpoint | Descrição | Autenticação |
+|---|---|---|---|---|
+| Auth | `POST` | `/auth/register` | Cadastro e criação automática de conta | Não |
+| Auth | `POST` | `/auth/login` | Login e emissão de JWT | Não |
+| Users | `GET` | `/users/me` | Consulta do perfil e saldo | Sim |
+| Users | `PUT` | `/users/me` | Atualização do perfil | Sim |
+| Users | `PATCH` | `/users/change-password` | Alteração de senha | Sim |
+| Users | `DELETE` | `/users/me` | Desativação lógica do usuário | Sim |
+| Transfers | `POST` | `/transfers/{destinationAccountId}` | Transferência entre contas | Sim |
+| Payments | `POST` | `/payments` | Criação de cobrança | Sim |
+| Payments | `GET` | `/payments/{codigo}` | Consulta de cobrança | Não exige token segundo o fluxo atual |
+| Payments | `POST` | `/payments/{codigo}/pay` | Pagamento de cobrança | Sim |
+| Ledger | `GET` | `/ledger` | Extrato da conta autenticada | Sim |
+| Health | `GET` | `/health` | Verificação da conexão com o PostgreSQL | Não |
+
+### Idempotência nas operações financeiras
+
+As operações abaixo recebem o header `Idempotency-Key`:
+
+- `POST /transfers/{destinationAccountId}`
+- `POST /payments`
+- `POST /payments/{codigo}/pay`
+
+Exemplo:
 
 ```http
-Idempotency-Key: uma-chave-unica-da-operacao
+Idempotency-Key: transferencia-exemplo-001
 ```
 
-Uma repetição da mesma chave para o mesmo usuário e operação reutiliza o
-resultado persistido, evitando duplicidade em retries.
+A chave deve ser reutilizada somente em novas tentativas da **mesma operação lógica**. A implementação procura uma resposta previamente armazenada por usuário, operação e chave. O comportamento sob concorrência e falhas em momentos específicos ainda exige validação adicional com PostgreSQL real; veja as limitações conhecidas ao final deste documento.
 
-### Exemplos de requisições e respostas
+## 🧪 Exemplos de requisições
 
-Os exemplos abaixo usam `http://localhost:8080`, quando a API foi iniciada
-com Docker Compose. Para execução local sem Docker, substitua a base por
-`http://localhost:5201`, como nos arquivos `.http` do repositório.
+Os exemplos usam `http://localhost:8080`. Se executar a aplicação sem Docker, substitua a base por `http://localhost:5201`.
 
-#### 1. Cadastro
+### 1. Cadastrar usuário
 
 ```http
 POST /auth/register
 Content-Type: application/json
 
 {
-  "nome": "Gustavo",
+  "nome": "Usuário Exemplo",
   "documento": "12345678900",
-  "email": "gustavo@example.com",
+  "email": "usuario@example.com",
   "senha": "Senha-Forte-123"
 }
 ```
 
-Resposta `201 Created`:
+Resposta `201 Created` (exemplo):
 
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "expiresAt": "2026-10-19T17:02:57Z"
+  "accessToken": "SEU_TOKEN_JWT",
+  "expiresAt": "AAAA-MM-DDTHH:mm:ssZ"
 }
 ```
 
-#### 2. Login e obtenção do token
+### 2. Fazer login
 
 ```http
 POST /auth/login
 Content-Type: application/json
 
 {
-  "email": "gustavo@example.com",
+  "email": "usuario@example.com",
   "senha": "Senha-Forte-123"
 }
 ```
 
-Resposta `200 OK`:
+Utilize o `accessToken` retornado nas requisições autenticadas.
 
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "expiresAt": "2026-10-19T17:02:57Z"
-}
-```
+### 3. Transferir entre contas
 
-Use o valor de `accessToken` nas requisições protegidas:
-
-```http
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
-```
-
-#### 3. Transferência entre duas contas
-
-Considere que `destinationAccountId` é o GUID da conta de outro usuário e que
-a conta de origem possui saldo suficiente.
+`destinationAccountId` deve ser o GUID da conta de outro usuário, e a conta de origem precisa ter saldo suficiente.
 
 ```http
 POST /transfers/{destinationAccountId}
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Authorization: Bearer SEU_TOKEN_JWT
 Idempotency-Key: transferencia-exemplo-001
 Content-Type: application/json
 
@@ -295,159 +254,95 @@ Content-Type: application/json
 }
 ```
 
-Resposta `201 Created`:
+### 4. Criar uma cobrança
 
-```json
-{
-  "id": "0199f000-0000-7000-8000-000000000001",
-  "contaOrigemId": "0199f000-0000-7000-8000-000000000002",
-  "contaDestinoId": "0199f000-0000-7000-8000-000000000003",
-  "valor": 25.00,
-  "dataTransacao": "2026-10-19T16:05:00+00:00"
-}
-```
-
-#### 4. Criação e pagamento de uma cobrança
-
-Primeiro, o usuário recebedor cria a cobrança:
+A conta recebedora deve pertencer ao usuário autenticado.
 
 ```http
 POST /payments
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Authorization: Bearer SEU_TOKEN_JWT
 Idempotency-Key: cobranca-exemplo-001
 Content-Type: application/json
 
 {
-  "contaRecebedoraId": "0199f000-0000-7000-8000-000000000003",
+  "contaRecebedoraId": "GUID-DA-CONTA-RECEBEDORA",
   "valorOriginal": 50.00,
-  "dataVencimento": "2026-12-31",
+  "dataVencimento": "AAAA-MM-DD",
   "jurosDiario": 1.50
 }
 ```
 
-Resposta `201 Created`:
+A resposta contém o código que será utilizado para consultar e pagar a cobrança. Use uma data de vencimento válida, de acordo com as regras da API.
 
-```json
-{
-  "codigo": "a1b2c3d4e5f6...",
-  "contaRecebedoraId": "0199f000-0000-7000-8000-000000000003",
-  "valorOriginal": 50.00,
-  "valorAtualizado": 50.00,
-  "dataVencimento": "2026-12-31",
-  "jurosDiario": 1.50,
-  "paga": false
-}
-```
-
-Depois, o pagador usa o código retornado:
+### 5. Pagar uma cobrança
 
 ```http
 POST /payments/{codigo}/pay
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Authorization: Bearer SEU_TOKEN_JWT
 Idempotency-Key: pagamento-exemplo-001
 ```
 
-Resposta `200 OK`:
+Os arquivos [`payment-gateway-API.http`](./payment-gateway-API.http) e [`financial-api.http`](./financial-api.http) contêm requisições adicionais que podem ser executadas por clientes compatíveis com o formato `.http`.
 
-```json
-{
-  "codigo": "a1b2c3d4e5f6...",
-  "valorPago": 50.00,
-  "transacaoId": "0199f000-0000-7000-8000-000000000004",
-  "dataPagamento": "2026-10-19T16:06:00+00:00"
-}
-```
+## 🗄️ Modelo de dados
 
----
+| Entidade | Responsabilidade | Campos relevantes |
+|---|---|---|
+| `Usuarios` | Identidade e estado do usuário | `Id`, `Nome`, `Documento`, `Email`, `SenhaHash`, `Ativo` |
+| `Contas` | Conta digital e saldo | `Id`, `UsuarioId`, `Saldo`, `Version` |
+| `CodigosPagamento` | Cobranças emitidas | `Id`, `CodigoPagamentoHash`, `ContaGeradoraId`, `ValorOriginal`, `DataVencimento`, `JurosDiario`, `Status` |
+| `Transacoes` | Registro financeiro de entrada/saída | `Id`, `ContaOrigemId`, `ContaDestinoId`, `Valor`, `CodigoPagamentoId`, `DataTransacao` |
+| `IdempotencyRecords` | Respostas associadas a chaves idempotentes | `Id`, `UserId`, `Operation`, `Key`, `ResponseJson`, `CreatedAt` |
 
-## 🧪 Cenário de validação manual (E2E)
+O banco utiliza chaves estrangeiras e restrições de unicidade para campos como e-mail, documento, hash do código de cobrança e combinação de chave idempotente, usuário e operação.
 
-1. Cadastrar dois usuários  
-2. Autenticar com o usuário A  
-3. Realizar transferência para conta do usuário B  
-4. Gerar código de cobrança para conta B  
-5. Consultar código antes/depois do vencimento  
-6. Pagar cobrança com usuário A  
-7. Validar extrato dos dois usuários
+## ✅ Regras de negócio implementadas
 
----
+- Valores de operação devem ser positivos; juros não podem ser negativos.
+- Transferências exigem saldo suficiente e contas de origem/destino válidas e ativas.
+- Uma transferência registra débito, crédito e lançamento financeiro relacionados.
+- Uma cobrança possui valor original, vencimento e juros diários.
+- A cobrança não deve ser paga mais de uma vez.
+- O extrato consulta os lançamentos associados à conta autenticada.
+- A remoção de usuário é lógica, preservando conta e histórico.
 
-## 🛡️ Regras de negócio implementadas
+## 🧪 Testes
 
-- Transferência só ocorre com saldo suficiente
-- Valor de transação deve ser maior que zero
-- Contas devem existir e estar ativas para operar
-- Débito e crédito ocorrem na mesma transação de banco (ACID)
-- Cobrança paga não pode ser liquidada novamente
-- Juros de atraso são aplicados conforme regra de `JurosDiario`
-- A exclusão de usuário é lógica: o usuário é desativado para preservar a conta e o histórico financeiro
+A solução contém testes com **xUnit**, **Moq** e **FluentAssertions**. Os testes de serviço utilizam SQLite em memória. Há também um teste de integração com `WebApplicationFactory` e Testcontainers, que utiliza uma instância real de PostgreSQL para verificar o health check e o cadastro.
 
----
-
-## 🧪 Testes e Qualidade de Código
-
-A suíte de testes foi projetada com foco na integridade de dados e na validação das regras de negócio financeiras mais críticas (como transações ACID e cálculos de juros).
-
-### 🛠️ Stack de Testes
-* **Framework Principal:** `xUnit`
-* **Mocking & Mocks:** `Moq` (para isolamento de dependências e regras de serviço)
-* **Asserções:** `FluentAssertions` (para leitura declarativa e expressiva das validações)
-* **Persistência de teste:** SQLite em memória para isolar serviços e regras
-
-### 🎯 Matriz de principais Cobertura e Cenários Críticos
-
-| Nível | Componente / Feature | Cenários Validados |
-| :--- | :--- | :--- |
-| **Serviço** | `PaymentService` | Pagamento, rejeição de cobrança já paga, repetição idempotente, reutilização inconsistente de chave e congelamento do valor após a liquidação. |
-| **Serviço** | `TransferService` | Débito/crédito atômico, saldo insuficiente sem alteração parcial, repetição idempotente, reutilização inconsistente de chave e registro no ledger. |
-| **Serviço** | `LedgerService` | Consulta do histórico e distinção entre entradas e saídas. |
-| **Autenticação** | `LoginService` e `PasswordHasher` | Login válido, senha inválida sem diferenciar e-mail inexistente, hash de senha e bloqueio de usuário inativo. |
-| **JWT** | `JwtTokenGenerator` | Claims, emissor, audiência, expiração e rejeição de tokens expirados ou com assinatura inválida. |
-
-Os testes de concorrência entre requisições e a confirmação da atomicidade
-entre a operação financeira e o registro de idempotência dependem de
-PostgreSQL real. Atualmente, o teste de integração versionado cobre saúde e
-cadastro usando Testcontainers; os cenários de concorrência devem ser
-executados nesse mesmo ambiente antes de serem tratados como garantia da
-suíte SQLite em memória.
-
----
-
-### 🚀 Como Executar os Testes
-
-Executar toda a suíte de testes unitários localmente:
+### Executar os testes
 
 ```bash
-# Executar todos os testes da solução
 dotnet test
-
-# Executar exibindo o detalhamento de cada cenário testado
-dotnet test --logger "console;verbosity=detailed"
 ```
 
-Os testes HTTP com PostgreSQL usam Testcontainers. Para executá-los, inicie o
-Docker e defina `RUN_POSTGRES_INTEGRATION_TESTS=true` antes de executar:
+Para executar o teste de integração com PostgreSQL via Testcontainers, mantenha o Docker em execução e habilite explicitamente esse cenário.
+
+PowerShell:
 
 ```powershell
 $env:RUN_POSTGRES_INTEGRATION_TESTS = "true"
 dotnet test --filter "FullyQualifiedName~ApiIntegrationTests"
 ```
 
----
+Bash:
 
-### Regras de entrada
+```bash
+RUN_POSTGRES_INTEGRATION_TESTS=true dotnet test --filter "FullyQualifiedName~ApiIntegrationTests"
+```
 
-- Nome, documento e email respeitam os limites definidos no modelo de dados
-- Email é validado antes do cadastro ou atualização
-- Senhas possuem entre 8 e 100 caracteres
-- Valores financeiros e juros aceitam no máximo duas casas decimais
+## ⚠️ Escopo e limitações conhecidas
 
----
+Este projeto prioriza clareza e fundamentos técnicos para fins educacionais; não é uma plataforma financeira de produção.
+
+- **Revogação de JWT:** tokens emitidos não são invalidados imediatamente quando o usuário é desativado; continuam sujeitos à expiração configurada.
+- **Idempotência e atomicidade:** na versão pública atual, a persistência do resultado idempotente ocorre depois da confirmação de algumas operações financeiras. Isso deixa uma janela de falha entre a operação e o registro da resposta; portanto, a atomicidade completa entre ambos ainda não deve ser considerada garantida.
+- **Concorrência:** os cenários de concorrência e falha entre etapas ainda precisam ser validados com PostgreSQL real. Os testes com SQLite em memória não substituem esses testes.
 
 ## 👨‍💻 Autor
 
-**Gustavo Beirão**
+**Gustavo Beirão**  
 - GitHub: [@Gustavobvns](https://github.com/Gustavobvns)
 - Linkedin: https://linkedin.com/in/gustavo-beirão
 - Email: gustavobvns@gmail.com
-- Cel: (21) 99476-4457
+- Celular: (21) 99476-4457
