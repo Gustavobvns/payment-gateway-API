@@ -447,7 +447,7 @@ dotnet test --filter "FullyQualifiedName~ApiIntegrationTests"
 ## 👨‍💻 Autor
 
 **Gustavo Beirão**
-GitHub: [@Gustavobvns](https://github.com/Gustavobvns)
-Linkedin: https://linkedin/in/gustavo-beirão
-Email: gustavobvns@gmail.com
-Cel: (21) 99476-4457
+- GitHub: [@Gustavobvns](https://github.com/Gustavobvns)
+- Linkedin: https://linkedin.com/in/gustavo-beirão
+- Email: gustavobvns@gmail.com
+- Cel: (21) 99476-4457
