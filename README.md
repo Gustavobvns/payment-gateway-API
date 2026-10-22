@@ -336,8 +336,8 @@ RUN_POSTGRES_INTEGRATION_TESTS=true dotnet test --filter "FullyQualifiedName~Api
 Este projeto prioriza clareza e fundamentos técnicos para fins educacionais; não é uma plataforma financeira de produção.
 
 - **Revogação de JWT:** tokens emitidos não são invalidados imediatamente quando o usuário é desativado; continuam sujeitos à expiração configurada.
-- **Idempotência e atomicidade:** na versão pública atual, a persistência do resultado idempotente ocorre depois da confirmação de algumas operações financeiras. Isso deixa uma janela de falha entre a operação e o registro da resposta; portanto, a atomicidade completa entre ambos ainda não deve ser considerada garantida.
 - **Concorrência:** os cenários de concorrência e falha entre etapas ainda precisam ser validados com PostgreSQL real. Os testes com SQLite em memória não substituem esses testes.
+- **Testes PostgresSQL:** os testes de uso cobrem casos com SQLite, mas ainda não cobrem casos de integração com PostgreSQL.
 
 ## 👨‍💻 Autor
 
